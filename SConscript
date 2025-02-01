@@ -219,6 +219,7 @@ if sys.platform != 'darwin':
         'host',
         'linux',
         'uvrouter',
+        'netdev-afxdp',
     ]
 
     skip_dpdk_build = False

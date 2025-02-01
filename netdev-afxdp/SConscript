@@ -1,0 +1,41 @@
+# SConscript
+#
+# This SConscript builds a user-space binary using the AF_XDP backend code
+
+import os
+import subprocess
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+env.Append(CCFLAGS='-Werror -Wall')
+gpp_version = subprocess.check_output(
+    "g++ --version | grep g++ | awk '{print $3}'", shell=True).rstrip()
+if isinstance(gpp_version, bytes):
+    gpp_version = gpp_version.decode()
+if int(gpp_version.split(".")[0]) >= 8:
+    env.Append(CCFLAGS='-Wno-error=deprecated-declarations -Wno-deprecated-declarations')
+
+if env['OPT'] == 'debug':
+    env.Append(CCFLAGS='-DCOMPILE_DEBUG_LOGS')
+env.Append(CCFLAGS='-DALLOW_EXPERIMENTAL_API')
+
+# Include/lLib paths
+env.Append(LIBPATH = [env['TOP_LIB']])
+env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
+
+# Libraries
+env.Append(CPPPATH = [os.path.join('#', 'vrouter', 'include'),
+                      os.path.join('#', 'vrouter', 'sandesh', 'gen-c')])
+env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+env.Append(LIBS=['bpf', 'elf', 'xdp', 'z', 'dl', 'pthread'])
+
+afxdp_objs = env.Object(Glob('*.c'))
+vrouter = env.Program('contrail-vrouter-afxdp', afxdp_objs)
+
+env.Default(vrouter)
+env.Alias('install', env.Install(env['INSTALL_BIN'], vrouter))
+
+# Local Variables:
+# mode: python
+# End:
