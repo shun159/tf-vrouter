@@ -16,6 +16,7 @@
  */
 
 #include <errno.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,32 @@
 #include "afxdp_interface.h"
 
 static volatile int afxdp_stop = 0;
+static int no_daemon_set = 0;
+
+extern char *ContrailBuildInfo;
+
+// command line options
+static struct option long_options[] = {
+    {"no-daemon", no_argument, &no_daemon_set, 1},
+    {"help", no_argument, 0, 'h'},
+    {"version", no_argument, 0, 'v'},
+    {0, 0, 0, 0},
+};
+
+// Print version information
+static void version_print(void) {
+  /* Version information could be generated during build time. */
+  printf("vRouter/AF_XDP version: %s\n", ContrailBuildInfo);
+}
+
+// Print usage information
+static void Usage(void) {
+  printf("Usage: contrail-vrouter-afxdp [options]\n"
+         "  --no-daemon   Do not daemonize the process\n"
+         "  --help        Show this help message\n"
+         "  --version     Print version information\n");
+  exit(1);
+}
 
 static void afxdp_signal_handler(int signum) {
   fprintf(stdout, "Signal %d received, stopping...\n", signum);
@@ -31,6 +58,8 @@ static void afxdp_signal_handler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
+  int opt, option_index = 0;
+
   if (signal(SIGINT, afxdp_signal_handler) == SIG_ERR) {
     perror("signal(SIGINT)");
     exit(EXIT_FAILURE);
@@ -38,6 +67,24 @@ int main(int argc, char *argv[]) {
   if (signal(SIGTERM, afxdp_signal_handler) == SIG_ERR) {
     perror("signal(SIGTERM)");
     exit(EXIT_FAILURE);
+  }
+
+  while ((opt = getopt_long(argc, argv, "hv", long_options, &option_index)) !=
+         -1) {
+    switch (opt) {
+    case 0:
+      break;
+    case 'h':
+      Usage();
+      break;
+    case 'v':
+      version_print();
+      exit(0);
+      break;
+    default:
+      Usage();
+      break;
+    }
   }
 
   if (afxdp_init() != 0) {

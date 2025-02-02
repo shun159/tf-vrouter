@@ -1,12 +1,28 @@
-Language:        Cpp
-BasedOnStyle:    Google
-IndentWidth:     4
-ColumnLimit:     120
-BreakBeforeBraces: Allman
-AllowShortFunctionsOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: false
-AllowShortBlocksOnASingleLine: false
-PointerAlignment: Left
-DerivePointerAlignment: false
+AlwaysBreakAfterReturnType: AllDefinitions
+BreakBeforeBraces: Custom
+BraceWrapping: {
+  AfterFunction: 'true'
+}
+ColumnLimit: 120
+IndentCaseLabels: false
+IndentWidth: 2
+MaxEmptyLinesToKeep: 1
+PointerAlignment: Right
+IncludeCategories:
+  - Regex: '.*'
+    Priority: 1
+SortIncludes: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+TabWidth: 2
+BinPackParameters: false
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
 SortIncludes: false
 
