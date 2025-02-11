@@ -4,9 +4,14 @@
 
 import os
 import subprocess
+import scons_compiledb
 
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
+
+scons_compiledb.enable_with_cmdline(env)
+config = scons_compiledb.Config(db='compile_commands.json')
+scons_compiledb.enable(env, config)
 
 env.Append(CCFLAGS='-Werror -Wall')
 gpp_version = subprocess.check_output(
@@ -14,7 +19,7 @@ gpp_version = subprocess.check_output(
 if isinstance(gpp_version, bytes):
     gpp_version = gpp_version.decode()
 if int(gpp_version.split(".")[0]) >= 8:
-    env.Append(CCFLAGS='-Wno-error=deprecated-declarations -Wno-deprecated-declarations')
+    env.Append(CCFLAGS='-Wno-error=deprecated-declarations -Wno-deprecated-declarations -Wno-address-of-packed-member')
 
 if env['OPT'] == 'debug':
     env.Append(CCFLAGS='-DCOMPILE_DEBUG_LOGS')
@@ -28,13 +33,15 @@ env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 env.Append(CPPPATH = [os.path.join('#', 'vrouter', 'include'),
                       os.path.join('#', 'vrouter', 'sandesh', 'gen-c')])
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
-env.Append(LIBS=['bpf', 'elf', 'xdp', 'z', 'dl', 'pthread'])
+env.Append(LIBS=['bpf', 'elf', 'xdp', 'z', 'dl', 'pthread', 'rt', 'urcu-qsbr', 'urcu-bp'])
 
 afxdp_objs = env.Object(Glob('*.c'))
 vrouter = env.Program('contrail-vrouter-afxdp', afxdp_objs)
 
 env.Default(vrouter)
 env.Alias('install', env.Install(env['INSTALL_BIN'], vrouter))
+
+env.CompileDb()
 
 # Local Variables:
 # mode: python

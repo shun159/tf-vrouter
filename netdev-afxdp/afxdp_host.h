@@ -11,16 +11,14 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
+ * afxdp_vrouter.c -- vRouter/AF_XDP application
+ *
  */
 
-#ifndef __VR_AFXDP_H__
-#define __VR_AFXDP_H__
+#ifndef __VR_AFXDP_HOST_H__
 
-#include "vr_interface.h"
-#include "vr_packet.h"
+#include "vrouter.h"
 
-// initializers for AF_XDP
-int afxdp_init(void);
-void afxdp_exit(void);
+struct host_os *vrouter_get_host(void);
 
-#endif /* __VR_AFXDP_H__ */
+#endif // __VR_AFXDP_HOST_H__

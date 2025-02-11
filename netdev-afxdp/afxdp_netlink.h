@@ -13,14 +13,10 @@
  *
  */
 
-#ifndef __VR_AFXDP_H__
-#define __VR_AFXDP_H__
+#ifndef __VR_AFXDP_NETLINK_H__
 
-#include "vr_interface.h"
-#include "vr_packet.h"
+int vr_afxdp_netlink_init(void);
+int vr_afxdp_netlink_loop(void);
+int afxdp_netlink_receive(void *, char *, unsigned int);
 
-// initializers for AF_XDP
-int afxdp_init(void);
-void afxdp_exit(void);
-
-#endif /* __VR_AFXDP_H__ */
+#endif //  __VR_AFXDP_NETLINK_H__
