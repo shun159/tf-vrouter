@@ -103,7 +103,6 @@ afxdp_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len)
   request.vr_message_len = nl_len - HDR_LEN;
 
   ret = vr_message_request(&request);
-  fprintf(stdout, "hogehgoe ret: %d\n", ret);
   if (ret < 0)
     vr_send_response(ret);
 

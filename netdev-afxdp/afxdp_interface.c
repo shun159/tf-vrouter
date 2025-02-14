@@ -45,59 +45,6 @@ vr_host_interface_exit(void)
   return;
 }
 
-static uint64_t prng_state = 0;
-static int prng_inited = 0;
-
-static inline uint64_t
-xorshift64(void)
-{
-  uint64_t x = prng_state;
-  x ^= x >> 12;
-  x ^= x << 25;
-  x ^= x >> 27;
-  prng_state = x;
-  return x * 2685821657736338717ULL;
-}
-
-static void
-seed_random(void)
-{
-  if (prng_inited) {
-    return;
-  }
-  prng_inited = 1;
-
-  /*
-   * Below is a trivial seeding example from current time.
-   * If you want better unpredictability, read from /dev/urandom here (once).
-   */
-  prng_state = (uint64_t)time(NULL);
-  (void)xorshift64();
-}
-
-void
-get_random_bytes(void *buf, int nbytes)
-{
-  int offset = 0;
-
-  if (!prng_inited) {
-    seed_random();
-  }
-
-  while (offset < nbytes) {
-    uint64_t rnd = xorshift64();
-
-    int chunk = nbytes - offset;
-    if (chunk >= 8) {
-      memcpy((uint8_t *)buf + offset, &rnd, 8);
-      offset += 8;
-    } else {
-      memcpy((uint8_t *)buf + offset, &rnd, chunk);
-      offset += chunk;
-    }
-  }
-}
-
 /* Define necessary parameters. These may be tuned as needed. */
 #define FRAME_SIZE 4096
 #define NUM_FRAMES XSK_UMEM__DEFAULT_FRAME_SIZE

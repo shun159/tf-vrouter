@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "afxdp_netlink.h"
+#include "afxdp_thread.h"
 #include "afxdp_interface.h"
 #include "vr_afxdp.h"
 #include "afxdp_host.h"
@@ -73,10 +73,17 @@ afxdp_signal_handler(int signum)
   afxdp_stop = 1;
 }
 
+bool
+vr_afxdp_is_stop_flag_set(void)
+{
+  return afxdp_stop == 1;
+}
+
 int
 main(int argc, char *argv[])
 {
   int opt, option_index = 0;
+  int ret;
 
   if (signal(SIGINT, afxdp_signal_handler) == SIG_ERR) {
     perror("signal(SIGINT)");
@@ -89,18 +96,15 @@ main(int argc, char *argv[])
 
   while ((opt = getopt_long(argc, argv, "hv", long_options, &option_index)) != -1) {
     switch (opt) {
-    case 0:
-      break;
     case 'h':
       Usage();
-      break;
+      exit(EXIT_SUCCESS);
     case 'v':
       version_print();
-      exit(0);
-      break;
+      exit(EXIT_SUCCESS);
     default:
       Usage();
-      break;
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -108,22 +112,32 @@ main(int argc, char *argv[])
     vrouter_host = vrouter_get_host();
   }
 
-  int ret;
+  if (vrouter_init() != 0) {
+    fprintf(stderr, "vrouter_init() failed.\n");
+    exit(EXIT_FAILURE);
+  }
 
-  ret = vrouter_init();
-  if (ret)
-    return ret;
-
-  ret = vr_sandesh_init();
-  if (ret)
-    return ret;
-
-  vr_afxdp_netlink_loop();
+  if (vr_sandesh_init() != 0) {
+    fprintf(stderr, "vr_sandesh_init() failed.\n");
+    exit(EXIT_FAILURE);
+  }
 
   if (afxdp_init() != 0) {
     fprintf(stderr, "AF_XDP initialization failed\n");
     exit(EXIT_FAILURE);
   }
+
+  ret = afxdp_spawn_threads();
+  if (ret != 0) {
+    perror("pthread_create(netlink)");
+    exit(EXIT_FAILURE);
+  }
+
+  while (!afxdp_stop) {
+    sleep(1);
+  }
+
+  afxdp_stop_threads();
 
   fprintf(stdout, "Exiting AF_XDP vRouter skeleton\n");
   return 0;

@@ -44,6 +44,9 @@ struct vr_afxdp_global {
 
 extern struct vr_afxdp_global vr_afxdp;
 
+/* Check if the stop flag is set */
+bool vr_afxdp_is_stop_flag_set(void);
+
 struct nlmsghdr *afxdp_nl_message_hdr(struct vr_message *);
 unsigned int afxdp_nl_message_len(struct vr_message *);
 

@@ -69,8 +69,8 @@ flow = env.Program(target = 'flow', source = flow_sources)
 vrfstats_sources = ['vrfstats.c']
 vrfstats = env.Program(target = 'vrfstats', source = vrfstats_sources)
 
-dropstats_sources = ['dropstats.c']
-dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
+#dropstats_sources = ['dropstats.c']
+#dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
 
 vxlan_sources = ['vxlan.c']
 vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
@@ -97,7 +97,7 @@ dpdkconf_sources = ['dpdkconf.c']
 dpdkconf = env.Program(target = 'dpdkconf', source = dpdkconf_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
-binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
+binaries  = [vif, rt, nh, mpls, flow, vrfstats, vxlan,
              vrouter, vrmemstats, vrftable, mirror, vrinfo, dpdkinfo, dpdkconf]
 
 qosmap_sources = ['qosmap.c']

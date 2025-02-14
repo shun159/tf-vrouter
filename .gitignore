@@ -3,6 +3,8 @@ dp-core/*.o
 dp-core/*.o.cmd
 linux/*.o.cmd
 linux/*.o
+utils/**/*.o
+utils/vtest/vhost/lib/
 *obj
 *tlog
 *pdb
