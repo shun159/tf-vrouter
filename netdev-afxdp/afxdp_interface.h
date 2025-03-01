@@ -23,4 +23,6 @@
 int afxdp_init(void);
 void afxdp_exit(void);
 
+__s32 get_mtu_by_ifindex(__u32 ifindex);
+
 #endif /* __VR_AFXDP_H__ */

@@ -38,6 +38,7 @@ static int no_daemon_set = 0;
 extern char *ContrailBuildInfo;
 
 struct vr_afxdp_global vr_afxdp;
+struct xsk_umem_info *global_umem;
 
 // command line options
 static struct option long_options[] = {

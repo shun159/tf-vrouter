@@ -35,7 +35,7 @@ afxdp_netlink_thread_func(void *arg)
     if (thread_info->is_thr_stop)
       break;
 
-    usleep(VR_DPDK_SLEEP_SERVICE_US);
+    usleep(VR_AFXDP_SLEEP_SERVICE_US);
   }
 
   fprintf(stderr, "Netlink thread: exiting.\n");

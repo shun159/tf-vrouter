@@ -13,10 +13,6 @@
  *
  */
 
-#ifndef __VR_AFXDP_NETLINK_H__
-
 int vr_afxdp_netlink_init(void);
 int vr_afxdp_netlink_loop(void);
 int afxdp_netlink_receive(void *, char *, unsigned int);
-
-#endif //  __VR_AFXDP_NETLINK_H__

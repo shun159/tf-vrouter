@@ -16,6 +16,9 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+#ifndef __VR_AFXDP_NETLINK_H__
+#define __VR_AFXDP_NETLINK_H__
+
 typedef enum {
   VR_AFXDP_THREAD_NETLINK,
   VR_AFXDP_THREAD_PACKET,
@@ -36,3 +39,5 @@ struct afxdp_thread {
 
 int afxdp_spawn_threads(void);
 void afxdp_stop_threads(void);
+
+#endif

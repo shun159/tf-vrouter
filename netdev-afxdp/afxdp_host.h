@@ -16,9 +16,11 @@
  */
 
 #ifndef __VR_AFXDP_HOST_H__
+#define __VR_AFXDP_HOST_H__
 
 #include "vrouter.h"
 
 struct host_os *vrouter_get_host(void);
+__u16 cpu_to_be_16(__u16 x);
 
 #endif // __VR_AFXDP_HOST_H__

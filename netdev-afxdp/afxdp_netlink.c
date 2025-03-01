@@ -181,7 +181,7 @@ vr_afxdp_netlink_loop(void)
     if (vr_afxdp_netlink_init() == 0)
       vr_usocket_io(vr_afxdp.netlink_sock);
 
-    usleep(VR_DPDK_SLEEP_SERVICE_US);
+    usleep(VR_AFXDP_SLEEP_SERVICE_US);
   }
 
   return 0;

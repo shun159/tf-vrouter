@@ -21,6 +21,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <net/if.h>
 
 #include <linux/if_link.h>
 #include <linux/if_xdp.h>
@@ -29,9 +32,44 @@
 #include <xdp/xsk.h>
 
 #include "afxdp_interface.h"
+#include "afxdp_global_umem.h"
 #include "vr_afxdp.h"
 
 extern void vhost_remove_xconnect(void);
+
+__s32
+get_mtu_by_ifindex(__u32 ifindex)
+{
+  char ifname[IFNAMSIZ];
+  struct ifreq ifr;
+  int sock;
+  int mtu;
+
+  if (!if_indextoname(ifindex, ifname)) {
+    fprintf(stderr, "if_indextoname failed: %s\n", strerror(errno));
+    return -1;
+  }
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
+  sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock < 0) {
+    fprintf(stderr, "socket failed: %s\n", strerror(errno));
+    return -1;
+  }
+
+  if (ioctl(sock, SIOCGIFMTU, &ifr) < 0) {
+    fprintf(stderr, "ioctl(SIOCGIFMTU) failed: %s\n", strerror(errno));
+    close(sock);
+    return -1;
+  }
+
+  close(sock);
+
+  mtu = ifr.ifr_mtu;
+  return mtu;
+}
 
 void
 vhost_remove_xconnect(void)
@@ -45,52 +83,6 @@ vr_host_interface_exit(void)
   return;
 }
 
-/* Define necessary parameters. These may be tuned as needed. */
-#define FRAME_SIZE 4096
-#define NUM_FRAMES XSK_UMEM__DEFAULT_FRAME_SIZE
-#define PROD_NUM_DESCS XSK_RING_PROD__DEFAULT_NUM_DESCS
-#define CONS_NUM_DESCS XSK_RING_CONS__DEFAULT_NUM_DESCS
-#define XDP_HEADROOM 64
-
-struct xsk_umem_info {
-  struct xsk_ring_prod fq;
-  struct xsk_ring_cons cq;
-  struct xsk_umem *umem;
-  void *buffer;
-};
-
-struct xsk_umem_info *global_umem = NULL;
-
-static int
-configure_xsk_umem(void *buffer, uint64_t size)
-{
-  int ret;
-
-  struct xsk_umem_config uconfig;
-
-  memset(&uconfig, 0, sizeof uconfig);
-  uconfig.fill_size = PROD_NUM_DESCS;
-  uconfig.comp_size = CONS_NUM_DESCS;
-  uconfig.frame_size = FRAME_SIZE;
-  uconfig.frame_headroom = XDP_HEADROOM;
-
-  global_umem = calloc(1, sizeof(*global_umem));
-  if (!global_umem)
-    return -1;
-
-  ret = xsk_umem__create(&global_umem->umem,
-                         buffer,
-                         size,
-                         &global_umem->fq,
-                         &global_umem->cq,
-                         &uconfig);
-  if (ret)
-    return errno;
-
-  global_umem->buffer = buffer;
-  return 0;
-}
-
 // afxdp_init initializes AF_XDP resources
 //
 // this function performs the following steps:
@@ -100,8 +92,7 @@ int
 afxdp_init(void)
 {
   struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
-  size_t umem_size = NUM_FRAMES * FRAME_SIZE;
-  void *umem_buf;
+  global_umem = NULL;
 
   // Allow unlimited locking of memory, so all memory needed for packet
   // buffers can be locked.
@@ -110,14 +101,7 @@ afxdp_init(void)
     return errno;
   }
 
-  // allocate memory for NUM_FRAMES of the default XDP frame size
-  if (posix_memalign(&umem_buf, sysconf(_SC_PAGESIZE), umem_size)) {
-    fprintf(stderr, "ERROR: Can't allocate buffer memory  \"%s\"\n", strerror(errno));
-    return errno;
-  }
-  memset(umem_buf, 0, NUM_FRAMES * FRAME_SIZE);
-
-  if (configure_xsk_umem(umem_buf, umem_size)) {
+  if (afxdp_global_umem_init()) {
     fprintf(stderr, "ERROR: Can't create umem \"%s\"\n", strerror(errno));
     return errno;
   }
@@ -170,6 +154,7 @@ afxdp_if_lock(void)
 static int
 afxdp_if_add(struct vr_interface *vif)
 {
+  fprintf(stdout, "%s: %s\n", __func__, vif->vif_name);
   return 0;
 }
 
@@ -194,6 +179,7 @@ afxdp_if_del_tap(struct vr_interface *vif)
 static int
 afxdp_if_add_tun_tap(struct vr_interface *vif, vr_interface_req *vifr)
 {
+  fprintf(stdout, "%s: %s\n", __func__, vifr->vifr_name);
   return 0;
 }
 
