@@ -97,12 +97,16 @@ struct vr_afxdp_umem_info {
 struct vr_afxdp_ethdev {
   __u16 os_ifidx;
   __u16 queue_id;
+
+  struct xsk_umem_config umem_cfg;
   struct xsk_socket *socket;
   struct xsk_ring_prod tx;
   struct xsk_ring_cons rx;
-  struct vr_afxdp_umem_info *umem_info;
   struct xsk_ring_prod *fill_ring;
   struct xsk_ring_cons *comp_ring;
+  struct xsk_umem *umem;
+  struct vr_afxdp_umem_info *umem_info;
+
   __u32 libbpf_flags;
   __u32 xdp_flags;
   __u16 bind_flags;
