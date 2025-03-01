@@ -12,18 +12,3 @@
  * GNU General Public License for more details.
  *
  */
-
-#ifndef __VR_AFXDP_H__
-#define __VR_AFXDP_H__
-
-#include "vr_interface.h"
-#include "vr_packet.h"
-
-// initializers for AF_XDP
-int afxdp_init(void);
-void afxdp_exit(void);
-
-__s32 get_mtu_by_ifindex(__u32 ifindex);
-__s32 get_nb_rxq_by_ifindex(__u32 ifindex);
-
-#endif /* __VR_AFXDP_H__ */

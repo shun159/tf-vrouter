@@ -24,6 +24,8 @@
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <net/if.h>
+#include <linux/ethtool.h>
+#include <linux/sockios.h>
 
 #include <linux/if_link.h>
 #include <linux/if_xdp.h>
@@ -61,14 +63,51 @@ get_mtu_by_ifindex(__u32 ifindex)
 
   if (ioctl(sock, SIOCGIFMTU, &ifr) < 0) {
     fprintf(stderr, "ioctl(SIOCGIFMTU) failed: %s\n", strerror(errno));
-    close(sock);
-    return -1;
+    goto err;
   }
 
   close(sock);
 
   mtu = ifr.ifr_mtu;
   return mtu;
+err:
+  close(sock);
+  return -1;
+}
+
+__s32
+get_nb_rxq_by_ifindex(__u32 ifindex)
+{
+  __s32 sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock < 0) {
+    fprintf(stderr, "open socket failed: %s\n", strerror(errno));
+    return -1;
+  }
+
+  char ifname[IFNAMSIZ];
+  struct ifreq ifr;
+  struct ethtool_channels ch = {.cmd = ETHTOOL_GCHANNELS};
+
+  if (!if_indextoname(ifindex, ifname)) {
+    fprintf(stderr, "if_indextoname failed: %s\n", strerror(errno));
+    goto err;
+  }
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
+  ifr.ifr_data = (void *)&ch;
+  if (ioctl(sock, SIOCETHTOOL, &ifr) < 0) {
+    fprintf(stderr, "ioctl(SIOCETHTOOL) failed: %s\n", strerror(errno));
+    goto err;
+  }
+
+  close(sock);
+  return ch.rx_count;
+
+err:
+  close(sock);
+  return -1;
 }
 
 void
