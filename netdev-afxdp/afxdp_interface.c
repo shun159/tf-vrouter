@@ -33,10 +33,13 @@
 #include <bpf/libbpf.h>
 #include <xdp/xsk.h>
 
+#include "afxdp_thread.h"
 #include "afxdp_interface.h"
 #include "afxdp_global_umem.h"
 #include "vr_afxdp.h"
 
+#define PAGE_SIZE 4096;
+const int max_netdevices = 8 * PAGE_SIZE;
 extern void vhost_remove_xconnect(void);
 
 __s32
@@ -110,6 +113,61 @@ err:
   return -1;
 }
 
+// Add fabric interface
+static int
+afxdp_veth_if_add(struct vr_interface *vif)
+{
+  struct vr_afxdp_ethdev *ethdev;
+
+  fprintf(stdout,
+          "Adding vif %u (gen. %u) AF_XDP veth device %s\n",
+          vif->vif_idx,
+          vif->vif_gen,
+          vif->vif_name);
+
+  ethdev = calloc(1, sizeof(struct vr_afxdp_ethdev));
+  if (!ethdev) {
+    fprintf(stderr, "Failed to allocate ethdev\n");
+    return -ENOMEM;
+  }
+
+  ethdev->os_ifidx = if_nametoindex((const char *)vif->vif_name);
+  if (ethdev->os_ifidx == 0) {
+    fprintf(stderr, "Invalid interface name %s\n", vif->vif_name);
+    free(ethdev);
+    return -EINVAL;
+  }
+
+  ethdev->vif_idx = vif->vif_idx;
+  ethdev->batch_size = BATCH_SIZE;
+  if (xsk_configure(ethdev)) {
+    fprintf(stderr, "Failed to configure XSK sockets %s\n", vif->vif_name);
+    return -1;
+  }
+
+  vif->vif_os = ethdev;
+  ethdev->num_queues = get_nb_rxq_by_ifindex(ethdev->os_ifidx);
+
+  for (__u32 qid = 0; qid < ethdev->num_queues; qid++) {
+    struct afxdp_thread *t = NULL;
+    struct afxdp_rx_arg *arg = calloc(1, sizeof(*arg));
+    if (!arg)
+      continue;
+
+    arg->vif = vif;
+    arg->queue_id = qid;
+
+    t = spawn_dynamic_thread(afxdp_rx_thread_func, arg, VR_AFXDP_THREAD_FWD);
+    if (!t) {
+      free(arg);
+      continue;
+    }
+    arg->ctrl = t;
+  }
+
+  return 0;
+}
+
 void
 vhost_remove_xconnect(void)
 {
@@ -136,7 +194,9 @@ afxdp_init(void)
   // Allow unlimited locking of memory, so all memory needed for packet
   // buffers can be locked.
   if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
-    fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK)  \"%s\"\n", strerror(errno));
+    fprintf(stderr,
+            "ERROR: setrlimit(RLIMIT_MEMLOCK)  \"%s\"\n",
+            strerror(errno));
     return errno;
   }
 
@@ -193,7 +253,16 @@ afxdp_if_lock(void)
 static int
 afxdp_if_add(struct vr_interface *vif)
 {
-  fprintf(stdout, "%s: %s\n", __func__, vif->vif_name);
+  if (vif_is_fabric(vif)) {
+  } else if (vif_is_vm(vif)) {
+  } else if (vif_is_vlan(vif)) {
+  } else if (vif_is_namespace(vif)) {
+    return afxdp_veth_if_add(vif);
+  } else if (vif_is_vhost(vif)) {
+  } else if (vif_is_agent(vif)) {
+  } else if (vif_is_monitoring(vif)) {
+  }
+
   return 0;
 }
 
@@ -229,7 +298,8 @@ afxdp_if_del_tun_tap(struct vr_interface *vif)
 }
 
 static int
-afxdp_if_get_settings(struct vr_interface *vif, struct vr_interface_settings *settings)
+afxdp_if_get_settings(struct vr_interface *vif,
+                      struct vr_interface_settings *settings)
 {
   return 0;
 }
@@ -252,13 +322,15 @@ afxdp_if_get_encap(struct vr_interface *vif)
 }
 
 static int
-afxdp_if_get_bond_info(struct vr_interface *vif, struct vr_interface_bond_info *bond_info)
+afxdp_if_get_bond_info(struct vr_interface *vif,
+                       struct vr_interface_bond_info *bond_info)
 {
   return 0;
 }
 
 static int
-afxdp_if_get_vlan_info(struct vr_interface *vif, struct vr_interface_vlan_info *vlan_info)
+afxdp_if_get_vlan_info(struct vr_interface *vif,
+                       struct vr_interface_vlan_info *vlan_info)
 {
   return 0;
 }
@@ -270,7 +342,9 @@ afxdp_if_clear_stats(struct vr_interface *vif)
 }
 
 static int
-afxdp_get_host_ip_mask(struct vr_interface *vif, unsigned int *ip, unsigned int *mask)
+afxdp_get_host_ip_mask(struct vr_interface *vif,
+                       unsigned int *ip,
+                       unsigned int *mask)
 {
   return 0;
 }
@@ -294,7 +368,8 @@ struct vr_host_interface_ops afxdp_interface_ops = {
     .hif_rx = afxdp_if_rx,
     .hif_get_settings = afxdp_if_get_settings,
     .hif_get_mtu = afxdp_if_get_mtu,
-    .hif_get_encap = afxdp_if_get_encap, /* always returns VIF_ENCAP_TYPE_ETHER */
+    .hif_get_encap =
+        afxdp_if_get_encap, /* always returns VIF_ENCAP_TYPE_ETHER */
     .hif_stats_update = afxdp_if_stats_update,
     .hif_get_bond_info = afxdp_if_get_bond_info,
     .hif_get_vlan_info = afxdp_if_get_vlan_info,

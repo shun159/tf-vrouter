@@ -41,8 +41,6 @@ vrouter = env.Program('contrail-vrouter-afxdp', afxdp_objs)
 env.Default(vrouter)
 env.Alias('install', env.Install(env['INSTALL_BIN'], vrouter))
 
-env.CompileDb()
-
 # Local Variables:
 # mode: python
 # End:

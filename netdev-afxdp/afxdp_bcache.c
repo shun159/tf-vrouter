@@ -39,7 +39,8 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
     return NULL;
 
   /* bpool internals dimensioning. */
-  n_slabs = (params->n_buffers + params->n_buffers_per_slab - 1) / params->n_buffers_per_slab;
+  n_slabs = (params->n_buffers + params->n_buffers_per_slab - 1) /
+            params->n_buffers_per_slab;
   n_slabs_reserved = params->n_users_max * 2;
   n_buffers = n_slabs * params->n_buffers_per_slab;
   n_buffers_reserved = n_slabs_reserved * params->n_buffers_per_slab;
@@ -49,13 +50,15 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
   buffers_size = n_buffers * sizeof(__u64);
   buffers_reserved_size = n_buffers_reserved * sizeof(__u64);
 
-  total_size = sizeof(struct bpool) + slabs_size + slabs_reserved_size + buffers_size +
-               buffers_reserved_size;
+  total_size = sizeof(struct bpool) + slabs_size + slabs_reserved_size +
+               buffers_size + buffers_reserved_size;
 
   /* bpool memory allocation. */
   p = calloc(total_size, sizeof(__u8));
-  if (!p)
+  if (!p) {
+    fprintf(stderr, "bpool_init: failed calloc\n");
     return NULL;
+  }
 
   bp = (struct bpool *)p;
   memcpy(&bp->params, params, sizeof(*params));
@@ -63,9 +66,10 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
 
   bp->slabs = (__u64 **)&p[sizeof(struct bpool)];
   bp->slabs_reserved = (__u64 **)&p[sizeof(struct bpool) + slabs_size];
-  bp->buffers = (__u64 *)&p[sizeof(struct bpool) + slabs_size + slabs_reserved_size];
-  bp->buffers_reserved =
-      (__u64 *)&p[sizeof(struct bpool) + slabs_size + slabs_reserved_size + buffers_size];
+  bp->buffers =
+      (__u64 *)&p[sizeof(struct bpool) + slabs_size + slabs_reserved_size];
+  bp->buffers_reserved = (__u64 *)&p[sizeof(struct bpool) + slabs_size +
+                                     slabs_reserved_size + buffers_size];
 
   bp->n_slabs = n_slabs;
   bp->n_slabs_reserved = n_slabs_reserved;
@@ -76,7 +80,8 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
   bp->n_slabs_available = n_slabs;
 
   for (i = 0; i < n_slabs_reserved; i++)
-    bp->slabs_reserved[i] = &bp->buffers_reserved[i * params->n_buffers_per_slab];
+    bp->slabs_reserved[i] =
+        &bp->buffers_reserved[i * params->n_buffers_per_slab];
   bp->n_slabs_reserved_available = n_slabs_reserved;
 
   for (i = 0; i < n_buffers; i++)
@@ -85,6 +90,7 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
   /* lock. */
   status = pthread_mutex_init(&bp->lock, NULL);
   if (status) {
+    fprintf(stderr, "bpool_init: mutex init\n");
     free(p);
     return NULL;
   }
@@ -97,6 +103,7 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
                   -1,
                   0);
   if (bp->addr == MAP_FAILED) {
+    fprintf(stderr, "bpool_init: mmap failed\n");
     pthread_mutex_destroy(&bp->lock);
     free(p);
     return NULL;
@@ -110,6 +117,7 @@ bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg)
                             &bp->umem_cq,
                             umem_cfg);
   if (status) {
+    fprintf(stderr, "bpool_init: umem create failed: %s\n", strerror(errno));
     munmap(bp->addr, bp->params.n_buffers * bp->params.buffer_size);
     pthread_mutex_destroy(&bp->lock);
     free(p);

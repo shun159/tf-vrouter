@@ -13,18 +13,7 @@
  *
  */
 
-#include <linux/types.h>
-#include <pthread.h>
-#include <xdp/xsk.h>
-
 #include "vr_afxdp.h"
 
-struct bpool *bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg);
-void bpool_free(struct bpool *bp);
-
-__u32 bcache_slab_size(struct bcache *bc);
-struct bcache *bcache_init(struct bpool *bp);
-void bcache_free(struct bcache *bc);
-__u32 bcache_cons_check(struct bcache *bc, __u32 n_buffers);
-__u64 bcache_cons(struct bcache *bc);
-void bcache_prod(struct bcache *bc, __u64 buffer);
+int afxdp_recv(struct vr_interface *vif, __u32 queue_id);
+int afxdp_pkt_recycle(struct vr_packet *pkt);

@@ -21,15 +21,6 @@
 #ifndef __VR_AFXDP_UMEM_GLOBAL_H__
 #define __VR_AFXDP_UMEM_GLOBAL_H__
 
-/* Define necessary parameters. These may be tuned as needed. */
-#define FRAME_SIZE 4096
-#define FRAME_SHIFT 12
-#define MAX_FRAMES 4096
-
-#define NUM_FRAMES XSK_UMEM__DEFAULT_FRAME_SIZE
-#define PROD_NUM_DESCS XSK_RING_PROD__DEFAULT_NUM_DESCS
-#define CONS_NUM_DESCS XSK_RING_CONS__DEFAULT_NUM_DESCS
-
 extern struct xsk_umem_info *global_umem;
 
 struct xsk_umem_info {

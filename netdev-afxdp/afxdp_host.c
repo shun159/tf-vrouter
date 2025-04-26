@@ -13,11 +13,13 @@
  *
  */
 
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/time.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <sched.h>
 
 #include "vr_os.h"
 #include "vr_packet.h"
@@ -27,6 +29,7 @@
 #include "vr_sandesh.h"
 #include "vr_afxdp.h"
 #include "afxdp_interface.h"
+#include "afxdp_ethdev.h"
 #include "afxdp_host.h"
 #include "afxdp_global_umem.h"
 #include "host/vr_host_packet.h"
@@ -108,7 +111,10 @@ vr_lib_get_packet(struct vr_hpacket *hpkt, struct vr_interface *vif)
 }
 
 int
-vr_hpacket_copy(unsigned char *dst, struct vr_hpacket *hpkt_src, __u32 offset, __u32 len)
+vr_hpacket_copy(unsigned char *dst,
+                struct vr_hpacket *hpkt_src,
+                __u32 offset,
+                __u32 len)
 {
   __u16 tocopy, copied;
   unsigned char *src;
@@ -186,7 +192,8 @@ vr_hpacket_alloc(__u32 size)
   if (!hpkt)
     return NULL;
 
-  hpkt->hp_head = malloc(size + VR_HPACKET_HEAD_SPACE + sizeof(struct vr_hpacket_tail));
+  hpkt->hp_head =
+      malloc(size + VR_HPACKET_HEAD_SPACE + sizeof(struct vr_hpacket_tail));
   if (!hpkt->hp_head) {
     free(hpkt);
     return NULL;
@@ -339,21 +346,23 @@ vr_lib_palloc_head(struct vr_packet *pkt, __u32 size)
   return &hpkt_head->hp_packet;
 }
 
-static void
-vr_lib_pfree(struct vr_packet *pkt, __u16 reason)
+static inline void
+vr_lib_pfree(struct vr_packet *pkt, uint16_t reason)
 {
-  struct vr_hpacket *hpkt;
+  if (!pkt)
+    return;
 
-  /* Handle Vrouter statistics */
-  pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+  // if (pkt->vp_if)
+  //   pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
 
-  hpkt = VR_PACKET_TO_HPACKET(pkt);
-  vr_hpacket_free(hpkt);
-  return;
+  afxdp_pkt_recycle(pkt);
 }
 
 static int
-vr_lib_pcopy(unsigned char *dst, struct vr_packet *p_src, __u32 offset, __u32 len)
+vr_lib_pcopy(unsigned char *dst,
+             struct vr_packet *p_src,
+             __u32 offset,
+             __u32 len)
 {
   struct vr_hpacket *src_hpkt = VR_PACKET_TO_HPACKET(p_src);
 
@@ -605,7 +614,8 @@ afxdp_adjust_tcp_mss(struct tcphdr *tcph, __u16 overlay_len, __u8 iph_len)
       if (router->vr_eth_if[0] == NULL)
         return;
 
-      port_id = (((struct vr_afxdp_ethdev *)(router->vr_eth_if[0]->vif_os))->os_ifidx);
+      port_id = (((struct vr_afxdp_ethdev *)(router->vr_eth_if[0]->vif_os))
+                     ->os_ifidx);
       mtu = get_mtu_by_ifindex(port_id);
       max_mss = mtu - (overlay_len + iph_len + sizeof(struct tcphdr));
       if (pkt_mss > max_mss) {
@@ -840,7 +850,8 @@ get_random_bytes(void *buf, int nbytes)
   }
 }
 
-//  vr_afxdp_pkt_to_xdp_buf - Convert a pointer to vr_packet into the associated vr_xdp_buf ptr
+//  vr_afxdp_pkt_to_xdp_buf - Convert a pointer to vr_packet into the associated
+//  vr_xdp_buf ptr
 struct vr_xdp_buf *
 vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt)
 {
@@ -848,7 +859,8 @@ vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt)
   return (struct vr_xdp_buf *)((uintptr_t)pkt - sizeof(struct vr_xdp_buf));
 }
 
-// vr_afxdp_xdp_buf_to_pkt - Convert a pointer to vr_xdp_buf into the associated vr_packet ptr
+// vr_afxdp_xdp_buf_to_pkt - Convert a pointer to vr_xdp_buf into the associated
+// vr_packet ptr
 struct vr_packet *
 vr_afxdp_xdp_buf_to_pkt(struct vr_xdp_buf *xdp_buf)
 {
@@ -861,7 +873,8 @@ afxdp_xpacket_from_pkt(struct vr_packet *pkt)
   return CONTAINER_OF(pkt, struct vr_xpacket, pkt);
 }
 
-// fxdp_xdp_buf_copy - Copy the given vr_xdp_buf (including metadata) from the pool.
+// fxdp_xdp_buf_copy - Copy the given vr_xdp_buf (including metadata) from the
+// pool.
 struct vr_xdp_buf *
 afxdp_xdp_buf_copy(struct vr_xdp_buf *src, void *pool)
 {
@@ -957,6 +970,43 @@ vr_afxdp_packet_init(struct vr_xdp_buf *xbuf,
 
   pkt->vp_cpu = vr_get_cpu();
   pkt->vp_if = NULL;
+}
+
+struct vr_packet *
+vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
+                    const struct xdp_desc *desc,
+                    struct vr_interface *vif,
+                    char *data,
+                    __u32 queue_id)
+{
+  struct vr_packet *pkt;
+
+  __u32 len = desc->len;
+  __u32 headroom = AFXDP_PKT_HEADROOM;
+
+  struct afxdp_meta *m = (struct afxdp_meta *)(data - headroom);
+  m->umem_addr = desc->addr;
+  m->xsk = xsk;
+
+  pkt = (struct vr_packet *)(m + 1);
+  pkt->vp_head = (unsigned char *)(data - headroom);
+  pkt->vp_data = headroom;
+  pkt->vp_tail = headroom + len;
+  pkt->vp_len = len;
+  pkt->vp_end = FRAME_SIZE;
+  pkt->vp_cpu = sched_getcpu();
+  pkt->vp_if = vif;
+  pkt->vp_queue = queue_id;
+  pkt->vp_network_h = pkt->vp_inner_network_h = 0;
+  pkt->vp_nh = NULL;
+  pkt->vp_flags = 0;
+  pkt->vp_ttl = 64;
+  pkt->vp_type = VP_TYPE_NULL;
+  pkt->vp_queue = VP_QUEUE_INVALID;
+  pkt->vp_priority = VP_PRIORITY_INVALID;
+  pkt->vp_rx_pass = 0;
+
+  return pkt;
 }
 
 void

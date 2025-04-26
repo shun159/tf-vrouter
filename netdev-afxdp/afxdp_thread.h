@@ -15,6 +15,7 @@
 
 #include <stdbool.h>
 #include <pthread.h>
+#include <linux/types.h>
 
 #ifndef __VR_AFXDP_NETLINK_H__
 #define __VR_AFXDP_NETLINK_H__
@@ -35,9 +36,22 @@ struct afxdp_thread {
   bool is_thr_stop;
 };
 
+struct afxdp_rx_arg {
+  struct vr_interface *vif;
+  __u32 queue_id;
+  struct afxdp_thread *ctrl;
+};
+
 #define NUM_FWD_THREADS 2
+
+typedef void *(*afxdp_thread_func_t)(void *);
 
 int afxdp_spawn_threads(void);
 void afxdp_stop_threads(void);
+
+void *afxdp_rx_thread_func(void *arg);
+struct afxdp_thread *spawn_dynamic_thread(afxdp_thread_func_t func,
+                                          void *arg,
+                                          afxdp_thread_type_t type);
 
 #endif

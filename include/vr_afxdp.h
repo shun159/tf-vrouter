@@ -34,21 +34,125 @@
 #define VR_AFXDP_SLEEP_SERVICE_US 100
 #define VR_AFXDP_MAX_FRAGMENT_ELEMENTS 1024
 
+/* Define necessary parameters. These may be tuned as needed. */
+#define FRAME_SIZE 4096
+#define FRAME_SHIFT 12
+#define MAX_FRAMES 4096
+
+#define NUM_FRAMES XSK_UMEM__DEFAULT_FRAME_SIZE
+#define PROD_NUM_DESCS XSK_RING_PROD__DEFAULT_NUM_DESCS
+#define CONS_NUM_DESCS XSK_RING_CONS__DEFAULT_NUM_DESCS
+
+#define BATCH_SIZE 32
+
+//  Buffer pool and buffer cache
+struct bpool_params {
+  __u32 n_buffers;
+  __u32 buffer_size;
+  __s32 mmap_flags;
+
+  __u32 n_users_max;
+  __u32 n_buffers_per_slab;
+};
+
+/* This buffer pool implementation organizes the buffers into equally sized
+ * slabs of *n_buffers_per_slab*. Initially, there are *n_slabs* slabs in the
+ * pool that are completely filled with buffer pointers (full slabs).
+ *
+ * Each buffer cache has a slab for buffer allocation and a slab for buffer
+ * free, with both of these slabs initially empty. When the cache's allocation
+ * slab goes empty, it is swapped with one of the available full slabs from the
+ * pool, if any is available. When the cache's free slab goes full, it is
+ * swapped for one of the empty slabs from the pool, which is guaranteed to
+ * succeed.
+ *
+ * Partially filled slabs never get traded between the cache and the pool
+ * (except when the cache itself is destroyed), which enables fast operation
+ * through pointer swapping.
+ */
+struct bpool {
+  struct bpool_params params;
+  pthread_mutex_t lock;
+  void *addr;
+
+  __u64 **slabs;
+  __u64 **slabs_reserved;
+  __u64 *buffers;
+  __u64 *buffers_reserved;
+
+  __u64 n_slabs;
+  __u64 n_slabs_reserved;
+  __u64 n_buffers;
+
+  __u64 n_slabs_available;
+  __u64 n_slabs_reserved_available;
+
+  struct xsk_umem_config umem_cfg;
+  struct xsk_ring_prod umem_fq;
+  struct xsk_ring_cons umem_cq;
+  struct xsk_umem *umem;
+};
+
+/* This buffer pool implementation organizes the buffers into equally sized
+ * slabs of *n_buffers_per_slab*. Initially, there are *n_slabs* slabs in the
+ * pool that are completely filled with buffer pointers (full slabs).
+ *
+ * Each buffer cache has a slab for buffer allocation and a slab for buffer
+ * free, with both of these slabs initially empty. When the cache's allocation
+ * slab goes empty, it is swapped with one of the available full slabs from the
+ * pool, if any is available. When the cache's free slab goes full, it is
+ * swapped for one of the empty slabs from the pool, which is guaranteed to
+ * succeed.
+ *
+ * Partially filled slabs never get traded between the cache and the pool
+ * (except when the cache itself is destroyed), which enables fast operation
+ * through pointer swapping.
+ */
+struct bcache {
+  struct bpool *bp;
+
+  __u64 *slab_cons;
+  __u64 *slab_prod;
+
+  __u64 n_buffers_cons;
+  __u64 n_buffers_prod;
+};
+
+static const struct xsk_umem_config umem_cfg_default = {
+    .fill_size = PROD_NUM_DESCS * 2,
+    .comp_size = CONS_NUM_DESCS,
+    .frame_size = NUM_FRAMES,
+    .frame_headroom = XSK_UMEM__DEFAULT_FRAME_HEADROOM,
+    .flags = 0,
+};
+
+static const struct bpool_params bpool_params_default = {
+    .n_buffers = 64 * 1024,
+    .buffer_size = NUM_FRAMES,
+    .mmap_flags = 0,
+    .n_users_max = 16,
+    .n_buffers_per_slab = PROD_NUM_DESCS * 2,
+};
+
 /*
  * vr_xdp_buf <=> vr_packet conversion
  *
- * In the AF_XDP design, the packet buffer layout in UMEM is arranged as follows:
+ * In the AF_XDP design, the packet buffer layout in UMEM is arranged as
+ * follows:
  *
- *      [ struct vr_xdp_buf ] + [ struct vr_packet ] + headroom + data + tailroom
+ *      [ struct vr_xdp_buf ] + [ struct vr_packet ] + headroom + data +
+ * tailroom
  *
  * Here, 'struct vr_xdp_buf' serves a role similar to afxdp's 'struct rte_mbuf',
  * holding metadata about the allocated UMEM frame.
  *
  * Typical fields include:
- *   - umem:      Pointer to the UMEM context from which this buffer is allocated.
+ *   - umem:      Pointer to the UMEM context from which this buffer is
+ * allocated.
  *   - addr:      Offset (in bytes) within the UMEM where this frame begins.
  *   - buf_len:   Total length of the allocated frame (constant: FRAME_SIZE).
- *   - data_len:  Length of the received packet data (set by XDP, from xdp_desc).
+ *   - data_len:  Length of the received packet data (set by XDP, from
+ * xdp_desc).
  *
  * The 'struct vr_packet' immediately follows this metadata structure.
  *
@@ -93,28 +197,29 @@ struct vr_afxdp_umem_info {
   __u8 flags;
 };
 
+struct vr_afxdp_xsk_socket_info {
+  struct xsk_ring_cons rx;
+  struct xsk_ring_prod tx;
+  struct xsk_ring_prod fq;
+  struct xsk_ring_cons cq;
+  struct xsk_umem *umem;
+  struct xsk_socket *xsk;
+  struct bpool *bpool;
+  struct bcache *bcache;
+  struct bpool_params bpool_params;
+  __u32 outstanding_tx; /* Number of descriptors filled in tx and cq. */
+  __u32 available_rx;   /* Number of descriptors filled in rx and fq. */
+};
+
 // Ethdev configuration
 struct vr_afxdp_ethdev {
   __u16 os_ifidx;
-  __u16 queue_id;
+  __u32 vif_idx;
+  __u32 batch_size;
+  __u32 num_queues;
 
   struct xsk_umem_config umem_cfg;
-  struct xsk_socket *socket;
-  struct xsk_ring_prod tx;
-  struct xsk_ring_cons rx;
-  struct xsk_ring_prod *fill_ring;
-  struct xsk_ring_cons *comp_ring;
-  struct xsk_umem *umem;
-  struct vr_afxdp_umem_info *umem_info;
-
-  __u32 libbpf_flags;
-  __u32 xdp_flags;
-  __u16 bind_flags;
-  __u32 batch_size;
-  __u8 busy_poll;
-  __u16 tx_pkt_size;
-  __u32 outstanding_tx;
-  __u8 vif_idx;
+  struct vr_afxdp_xsk_socket_info **xsks;
 };
 
 /* Tapdev configuration. */
@@ -131,12 +236,28 @@ struct vr_afxdp_tapdev {
 
 #define AFXDP_PKT_HEADROOM 128
 
+static const struct xsk_socket_config xsk_cfg_default = {
+    .rx_size = CONS_NUM_DESCS,
+    .tx_size = PROD_NUM_DESCS,
+    .libbpf_flags = 0,
+    .bind_flags = 0,
+    .xdp_flags = 0,
+};
+
 struct vr_xpacket *afxdp_xpacket_from_pkt(struct vr_packet *pkt);
 struct vr_xdp_buf *vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt);
 struct vr_packet *vr_afxdp_xdp_buf_to_pkt(struct vr_xdp_buf *xdp_buf);
 struct vr_xdp_buf *afxdp_xdp_buf_copy(struct vr_xdp_buf *src, void *pool);
 void afxdp_xdp_buf_free(struct vr_xdp_buf *xdp_buf);
 struct vr_xdp_buf *afxdp_xdp_buf_alloc(void *pool);
+struct vr_packet *vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
+                                      const struct xdp_desc *desc,
+                                      struct vr_interface *vif,
+                                      char *data,
+                                      __u32 queue_id);
+
+int xsk_configure(struct vr_afxdp_ethdev *ethdev);
+void xsk_destroy_all(struct vr_afxdp_ethdev *ethdev);
 
 struct vr_afxdp_global {
   void *packet_event_sock;
@@ -149,6 +270,8 @@ struct vr_afxdp_global {
    * and kernel KNI events. The datapath is not affected. */
   pthread_mutex_t if_lock;
   /* Pointer to IP fragmentation memory pool (direct) */
+
+  struct vr_afxdp_ethdev ethdevs[VR_MAX_INTERFACES];
 };
 
 extern struct vr_afxdp_global vr_afxdp;

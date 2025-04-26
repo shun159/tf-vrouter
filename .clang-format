@@ -3,7 +3,7 @@ BreakBeforeBraces: Custom
 BraceWrapping: {
   AfterFunction: 'true'
 }
-ColumnLimit: 100
+ColumnLimit: 80
 IndentCaseLabels: false
 IndentWidth: 2
 MaxEmptyLinesToKeep: 1
