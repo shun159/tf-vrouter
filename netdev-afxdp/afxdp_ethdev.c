@@ -185,35 +185,43 @@ xsk_configure(struct vr_afxdp_ethdev *ethdev)
   return 0;
 }
 
+
 void
 xsk_destroy_all(struct vr_afxdp_ethdev *ethdev)
 {
-  __u32 n_rxq;
-  int i;
+    __u32 n_rxq = get_nb_rxq_by_ifindex(ethdev->os_ifidx);
+    struct bpool *shared_bp = NULL;
+    int i;
 
-  n_rxq = get_nb_rxq_by_ifindex(ethdev->os_ifidx);
-  if (ethdev->xsks) {
+    if (!ethdev->xsks)
+        return;
+
     for (i = 0; i < n_rxq; i++) {
-      struct vr_afxdp_xsk_socket_info *xsk_info = ethdev->xsks[i];
-      if (xsk_info) {
-        if (xsk_info->bpool) {
-          bpool_free(xsk_info->bpool);
-          xsk_info->bpool = NULL;
+        struct vr_afxdp_xsk_socket_info *xi = ethdev->xsks[i];
+        if (!xi)
+            continue;
+
+        if (!shared_bp && xi->bpool)
+            shared_bp = xi->bpool;
+
+        xsk_socket__delete(xi->xsk);
+
+        if (xi->bcache) {
+            bcache_free(xi->bcache);
+            xi->bcache = NULL;
         }
 
-        if (xsk_info->bcache) {
-          bcache_free(xsk_info->bcache);
-          xsk_info->bcache = NULL;
-        }
-
-        xsk_socket__delete(xsk_info->xsk);
-        free(xsk_info);
-      }
+        free(xi);
     }
+
     free(ethdev->xsks);
     ethdev->xsks = NULL;
-  }
+
+    if (shared_bp) {
+        bpool_free(shared_bp);
+    }
 }
+
 
 static inline void
 prepare_fill_queue(struct vr_afxdp_xsk_socket_info *xsk)

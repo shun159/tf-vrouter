@@ -683,16 +683,16 @@ vr_virtual_input(unsigned short vrf,
     pkt->vp_priority = VP_PRIORITY_INVALID;
   }
 
+  if (vr_pkt_type(pkt, 0, fmd) < 0) {
+    vif_drop_pkt(vif, pkt, 1);
+    return 0;
+  }
+
   DBG("vrf=%u vlan=%u vp_type=%u vp_flags=0x%x",
       vrf,
       vlan_id,
       pkt->vp_type,
       pkt->vp_flags);
-
-  if (vr_pkt_type(pkt, 0, fmd) < 0) {
-    vif_drop_pkt(vif, pkt, 1);
-    return 0;
-  }
 
   /*
    * we really do not allow any broadcast packets from interfaces

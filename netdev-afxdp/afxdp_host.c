@@ -352,9 +352,6 @@ vr_lib_pfree(struct vr_packet *pkt, uint16_t reason)
   if (!pkt)
     return;
 
-  // if (pkt->vp_if)
-  //   pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
-
   afxdp_pkt_recycle(pkt);
 }
 

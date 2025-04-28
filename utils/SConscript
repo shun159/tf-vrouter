@@ -17,6 +17,8 @@ if system_header_path:
 
 # CFLAGS
 env.Append(CCFLAGS = '-g')
+env.Append(CCFLAGS = '-fcommon')   # ← これを追加
+
 
 if 'install' in COMMAND_LINE_TARGETS:
     VRutilsEnv.Append(SRC_INSTALL_TARGET = '/utils/')

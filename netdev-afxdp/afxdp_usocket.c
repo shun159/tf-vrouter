@@ -95,7 +95,8 @@ usock_init_poll(struct vr_usocket *usockp)
 
   if (!usockp->usock_pfds) {
     usockp->usock_pfds =
-        vr_zalloc(sizeof(struct pollfd) * usockp->usock_max_cfds + 1, VR_USOCK_POLL_OBJECT);
+        vr_zalloc(sizeof(struct pollfd) * usockp->usock_max_cfds + 1,
+                  VR_USOCK_POLL_OBJECT);
     if (!usockp->usock_pfds) {
       usock_set_error(usockp, -ENOMEM);
       goto error_return;
@@ -138,7 +139,8 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 
   if (!parent->usock_children) {
     parent->usock_children =
-        vr_zalloc(sizeof(struct vr_usocket *) * USOCK_MAX_CHILD_FDS + 1, VR_USOCK_OBJECT);
+        vr_zalloc(sizeof(struct vr_usocket *) * USOCK_MAX_CHILD_FDS + 1,
+                  VR_USOCK_OBJECT);
     if (!parent->usock_children) {
       usock_set_error(parent, -ENOMEM);
       return -ENOMEM;
@@ -201,7 +203,8 @@ usock_unbind(struct vr_usocket *child)
 
   parent->usock_disconnects++;
   parent->usock_cfds--;
-  if ((parent->usock_state == LIMITED) && (parent->usock_cfds < USOCK_MAX_CHILD_FDS))
+  if ((parent->usock_state == LIMITED) &&
+      (parent->usock_cfds < USOCK_MAX_CHILD_FDS))
     parent->usock_state = LISTENING;
 
   child->usock_parent = NULL;
@@ -312,7 +315,8 @@ retry_read:
     }
 
     if (usockp->usock_buf_len < usockp->usock_read_len) {
-      usockp->usock_rx_buf = vr_malloc(usockp->usock_read_len, VR_USOCK_BUF_OBJECT);
+      usockp->usock_rx_buf =
+          vr_malloc(usockp->usock_read_len, VR_USOCK_BUF_OBJECT);
       if (!usockp->usock_rx_buf) {
         /* bad, but let's recover */
         usockp->usock_rx_buf = buf;
@@ -342,7 +346,11 @@ vr_usocket_bind(struct vr_usocket *usockp)
   bool server;
 
   optval = 1;
-  if (setsockopt(usockp->usock_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)))
+  if (setsockopt(usockp->usock_fd,
+                 SOL_SOCKET,
+                 SO_REUSEADDR,
+                 &optval,
+                 sizeof(optval)))
     return -errno;
 
   switch (usockp->usock_type) {
@@ -364,7 +372,9 @@ vr_usocket_bind(struct vr_usocket *usockp)
 
   case RAW:
     sun.sun_family = AF_UNIX;
-    strncpy(vr_packet_unix_file, vr_socket_dir, sizeof(vr_packet_unix_file) - 1);
+    strncpy(vr_packet_unix_file,
+            vr_socket_dir,
+            sizeof(vr_packet_unix_file) - 1);
     strncat(vr_packet_unix_file,
             "/" VR_PACKET_UNIX_NAME,
             sizeof(vr_packet_unix_file) - strlen(vr_packet_unix_file) - 1);
@@ -384,7 +394,12 @@ vr_usocket_bind(struct vr_usocket *usockp)
   }
 
 #ifdef VR_DPDK_USOCK_DUMP
-  RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d binding\n", __func__, pthread_self(), usockp->usock_fd);
+  RTE_LOG_DP(DEBUG,
+             USOCK,
+             "%s[%lx]: FD %d binding\n",
+             __func__,
+             pthread_self(),
+             usockp->usock_fd);
   rte_hexdump(stdout, "usock address dump:", addr, addrlen);
 #endif
   error = bind(usockp->usock_fd, addr, addrlen);
@@ -433,10 +448,18 @@ usock_alloc(unsigned short proto, unsigned short type)
       return NULL;
 
     /* set socket send buffer size */
-    ret = setsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &setsocksndbuff, sizeof(setsocksndbuff));
+    ret = setsockopt(sock_fd,
+                     SOL_SOCKET,
+                     SO_SNDBUF,
+                     &setsocksndbuff,
+                     sizeof(setsocksndbuff));
     if (ret == 0) {
       /* check if setting buffer succeeded */
-      ret = getsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &getsocksndbuff, &getsocksndbufflen);
+      ret = getsockopt(sock_fd,
+                       SOL_SOCKET,
+                       SO_SNDBUF,
+                       &getsocksndbuff,
+                       &getsocksndbufflen);
     }
   }
 
@@ -601,7 +624,8 @@ usock_netlink_write_responses(struct vr_usocket *usockp)
   int ret;
   struct vr_message *resp;
 
-  while ((resp = (struct vr_message *)vr_queue_dequeue(&usockp->usock_nl_responses))) {
+  while ((resp = (struct vr_message *)vr_queue_dequeue(
+              &usockp->usock_nl_responses))) {
     usockp->usock_tx_buf = (unsigned char *)afxdp_nl_message_hdr(resp);
     usockp->usock_write_len = afxdp_nl_message_len(resp);
     usockp->usock_write_offset = 0;
@@ -658,7 +682,9 @@ usock_write(struct vr_usocket *usockp)
 }
 
 int
-vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf, unsigned int len)
+vr_usocket_write(struct vr_usocket *usockp,
+                 unsigned char *buf,
+                 unsigned int len)
 {
   if (usockp->usock_tx_buf)
     return -1;
@@ -813,7 +839,6 @@ vr_usocket_io(void *transport)
     ret = poll(usockp->usock_pfds, usockp->usock_max_cfds, timeout);
     if (ret < 0) {
       usock_set_error(usockp, ret);
-      /* all other errors are fatal */
       if (errno != EINTR)
         goto return_from_io;
     }

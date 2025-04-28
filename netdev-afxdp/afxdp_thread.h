@@ -17,6 +17,8 @@
 #include <pthread.h>
 #include <linux/types.h>
 
+#include "afxdp_ethdev.h"
+
 #ifndef __VR_AFXDP_NETLINK_H__
 #define __VR_AFXDP_NETLINK_H__
 
@@ -48,6 +50,7 @@ typedef void *(*afxdp_thread_func_t)(void *);
 
 int afxdp_spawn_threads(void);
 void afxdp_stop_threads(void);
+void afxdp_register_ethdev(struct vr_afxdp_ethdev *ethdev);
 
 void *afxdp_rx_thread_func(void *arg);
 struct afxdp_thread *spawn_dynamic_thread(afxdp_thread_func_t func,
