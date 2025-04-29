@@ -197,6 +197,15 @@ struct vr_afxdp_umem_info {
   __u8 flags;
 };
 
+// tx burst cache
+#define AFXDP_TX_BURST_SZ 64
+
+struct vr_afxdp_tx_cache {
+  __u64 addr[AFXDP_TX_BURST_SZ];
+  __u32 len[AFXDP_TX_BURST_SZ];
+  __u32 n_pkts;
+};
+
 struct vr_afxdp_xsk_socket_info {
   struct xsk_ring_cons rx;
   struct xsk_ring_prod tx;
@@ -207,6 +216,7 @@ struct vr_afxdp_xsk_socket_info {
   struct bpool *bpool;
   struct bcache *bcache;
   struct bpool_params bpool_params;
+  struct vr_afxdp_tx_cache tx_cache;
   __u32 outstanding_tx; /* Number of descriptors filled in tx and cq. */
   __u32 available_rx;   /* Number of descriptors filled in rx and fq. */
 };

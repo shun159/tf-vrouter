@@ -33,6 +33,7 @@
 #include <bpf/libbpf.h>
 #include <xdp/xsk.h>
 
+#include "afxdp_bcache.h"
 #include "afxdp_thread.h"
 #include "afxdp_interface.h"
 #include "afxdp_global_umem.h"
@@ -228,6 +229,36 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
   printf("AF_XDP: afxdp_if_tx() called on vif index %d, packet size %d\n",
          vif->vif_idx,
          pkt->vp_len);
+
+  struct vr_afxdp_ethdev *ethdev = vif->vif_os;
+  struct vr_afxdp_xsk_socket_info *xi = ethdev->xsks[0];
+  struct vr_afxdp_tx_cache *cache = &xi->tx_cache;
+
+  void *umem_elem;
+
+  afxdp_tx_complete(xi);
+
+  if (bcache_pop(xi->bcache, &umem_elem)) {
+    vif_drop_pkt(vif, pkt, 1);
+    return -ENOBUFS;
+  }
+
+  memcpy(umem_elem, pkt_data(pkt), pkt_len(pkt));
+  __u64 ofs = (__u8 *)umem_elem - (__u8 *)xi->bpool->addr;
+
+  cache->addr[cache->n_pkts] = ofs;
+  cache->len[cache->n_pkts] = pkt_len(pkt);
+  cache->n_pkts++;
+
+  if (cache->n_pkts == AFXDP_TX_BURST_SZ) {
+    if (afxdp_tx_burst(xi, cache)) {
+      bcache_push(xi->bcache, umem_elem);
+      vif_drop_pkt(vif, pkt, 1);
+      return -ENOBUFS;
+    }
+  }
+
+  vr_pfree(pkt, 0);
   return 0;
 }
 
@@ -235,6 +266,7 @@ static int
 afxdp_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 {
   printf("AF_XDP: afxdp_if_rx() called on vif index %d\n", vif->vif_idx);
+
   return 0;
 }
 

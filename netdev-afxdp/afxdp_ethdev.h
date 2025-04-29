@@ -17,3 +17,6 @@
 
 int afxdp_recv(struct vr_interface *vif, __u32 queue_id);
 int afxdp_pkt_recycle(struct vr_packet *pkt);
+int afxdp_tx_burst(struct vr_afxdp_xsk_socket_info *xi,
+                   struct vr_afxdp_tx_cache *c);
+void afxdp_tx_complete(struct vr_afxdp_xsk_socket_info *xi);

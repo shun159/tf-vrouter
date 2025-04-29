@@ -19,7 +19,8 @@
 
 #include "vr_afxdp.h"
 
-struct bpool *bpool_init(struct bpool_params *params, struct xsk_umem_config *umem_cfg);
+struct bpool *bpool_init(struct bpool_params *params,
+                         struct xsk_umem_config *umem_cfg);
 void bpool_free(struct bpool *bp);
 
 __u32 bcache_slab_size(struct bcache *bc);
@@ -28,3 +29,5 @@ void bcache_free(struct bcache *bc);
 __u32 bcache_cons_check(struct bcache *bc, __u32 n_buffers);
 __u64 bcache_cons(struct bcache *bc);
 void bcache_prod(struct bcache *bc, __u64 buffer);
+int bcache_pop(struct bcache *bc, void **elem);
+void bcache_push(struct bcache *bc, void *elem);
