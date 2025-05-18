@@ -231,7 +231,7 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
          pkt->vp_len);
 
   struct vr_afxdp_ethdev *ethdev = vif->vif_os;
-  struct vr_afxdp_xsk_socket_info *xi = ethdev->xsks[0];
+  struct vr_afxdp_xsk_socket_info *xi = ethdev->xsks[pkt->vp_queue];
   struct vr_afxdp_tx_cache *cache = &xi->tx_cache;
 
   void *umem_elem;

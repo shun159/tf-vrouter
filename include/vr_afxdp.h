@@ -31,6 +31,7 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define VR_AFXDP_MAX_FLOW_TABLE_HOLD_COUNT 1000
 #define VR_AFXDP_SLEEP_SERVICE_US 100
 #define VR_AFXDP_MAX_FRAGMENT_ELEMENTS 1024
 
@@ -269,6 +270,14 @@ struct vr_packet *vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
 int xsk_configure(struct vr_afxdp_ethdev *ethdev);
 void xsk_destroy_all(struct vr_afxdp_ethdev *ethdev);
 
+int vr_afxdp_table_mem_init(unsigned int table,
+                            unsigned int entries,
+                            unsigned long size,
+                            unsigned int oentries,
+                            unsigned long osize);
+int vr_afxdp_bridge_init(void);
+int vr_afxdp_flow_init(void);
+
 struct vr_afxdp_global {
   void *packet_event_sock;
   // netlink event socket
@@ -281,10 +290,15 @@ struct vr_afxdp_global {
   pthread_mutex_t if_lock;
   /* Pointer to IP fragmentation memory pool (direct) */
 
+  void *flow_table;
+  void *bridge_table;
+
   struct vr_afxdp_ethdev ethdevs[VR_MAX_INTERFACES];
 };
 
 extern struct vr_afxdp_global vr_afxdp;
+
+extern int no_huge_set;
 
 /* Check if the stop flag is set */
 bool vr_afxdp_is_stop_flag_set(void);
