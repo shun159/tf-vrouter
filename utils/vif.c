@@ -87,13 +87,13 @@ static bool need_xconnect_if = false;
 static bool need_vif_id = false;
 static int if_xconnect_kindex[VR_MAX_PHY_INF] = {-1, -1, -1};
 static short vlan_id = -1;
-static int vr_ifflags;
+static int vr_ifflags = 0;
 static unsigned int core = (unsigned)-1;
 static int8_t vr_transport = 0;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set,
-    dhcp_set, mac_learn_set;
+    dhcp_set, mac_learn_set, uuc_flood_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set,
     pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
@@ -1269,7 +1269,8 @@ Usage()
   printf("\t   \t--transport [eth|pmd|virtual|socket]\n");
   printf("\t   \t--xconnect <physical interface name>\n");
   printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
-  printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci --mac-learn]\n");
+  printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci --mac-learn "
+         "--unknown-uc-flood]\n");
   printf("\t   [--delete <intf_id>|<intf_name>]\n");
   printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] "
          "[--get-drop-stats]\n");
@@ -1310,6 +1311,7 @@ enum if_opt_index {
   SOCK_DIR_OPT_INDEX,
   CLEAR_STATS_OPT_INDEX,
   MAC_LEARN_OPT_INDEX,
+  UNKNOWN_UC_FLOOD_OPT_INDEX,
   MAX_OPT_INDEX
 };
 
@@ -1341,6 +1343,10 @@ static struct option long_options[] = {
     [SOCK_DIR_OPT_INDEX] = {"sock-dir", required_argument, &sock_dir_set, 1},
     [CLEAR_STATS_OPT_INDEX] = {"clear", no_argument, &clear_stats_set, 1},
     [MAC_LEARN_OPT_INDEX] = {"mac-learn", no_argument, &mac_learn_set, 1},
+    [UNKNOWN_UC_FLOOD_OPT_INDEX] = {"unknown-uc-flood",
+                                    no_argument,
+                                    &uuc_flood_set,
+                                    1},
     [MAX_OPT_INDEX] = {NULL, 0, NULL, 0},
 };
 
@@ -1567,6 +1573,10 @@ parse_long_opts(int option_index, char *opt_arg)
 
   case MAC_LEARN_OPT_INDEX:
     vr_ifflags |= VIF_FLAG_MAC_LEARN;
+    break;
+
+  case UNKNOWN_UC_FLOOD_OPT_INDEX:
+    vr_ifflags |= VIF_FLAG_UNKNOWN_UC_FLOOD;
     break;
 
   default:
@@ -1956,6 +1966,10 @@ main(int argc, char *argv[])
     case 'r':
       mac_learn_set = 1;
       parse_long_opts(MAC_LEARN_OPT_INDEX, NULL);
+      break;
+    case 'u':
+      uuc_flood_set = 1;
+      parse_long_opts(UNKNOWN_UC_FLOOD_OPT_INDEX, NULL);
       break;
     case 0:
       parse_long_opts(option_index, optarg);

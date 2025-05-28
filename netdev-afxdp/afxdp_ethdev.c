@@ -303,47 +303,56 @@ afxdp_recv(struct vr_interface *vif, __u32 queue_id)
 inline void
 afxdp_tx_complete(struct vr_afxdp_xsk_socket_info *xi)
 {
-  __u32 idx, n = xsk_ring_cons__peek(&xi->bcache->bp->umem_cq, 64, &idx);
+  __u32 idx;
+  __u32 n = xsk_ring_cons__peek(&xi->bcache->bp->umem_cq, 64, &idx);
+  if (!n)
+    return;
+
   for (__u32 i = 0; i < n; i++) {
     __u64 addr = *xsk_ring_cons__comp_addr(&xi->bcache->bp->umem_cq, idx + i);
     bcache_push(xi->bcache, (uint8_t *)xi->bpool->addr + addr);
   }
-  if (n) {
-    xsk_ring_cons__release(&xi->cq, n);
-    xi->outstanding_tx -= n;
-  }
+
+  xsk_ring_cons__release(&xi->bcache->bp->umem_cq, n);
+  xi->outstanding_tx -= n;
 }
 
 static inline void
 afxdp_kick_tx(struct vr_afxdp_xsk_socket_info *xi)
 {
-  if (xsk_ring_prod__needs_wakeup(&xi->tx))
+  if (xsk_ring_prod__needs_wakeup(&xi->tx)) {
     sendto(xsk_socket__fd(xi->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
+  }
 }
 
 inline int
 afxdp_tx_burst(struct vr_afxdp_xsk_socket_info *xi, struct vr_afxdp_tx_cache *c)
 {
-  __u32 idx = 0;
+  __u32 i, idx = 0;
 
   if (!c->n_pkts)
     return 0;
 
   afxdp_tx_complete(xi);
+  afxdp_kick_tx(xi);
 
-  if (xsk_ring_prod__reserve(&xi->tx, c->n_pkts, &idx) != (int)c->n_pkts) {
-    for (__u32 i = 0; i < c->n_pkts; i++) {
-      struct xdp_desc *d = xsk_ring_prod__tx_desc(&xi->tx, idx + i);
-      d->addr = c->addr[i];
-      d->len = c->len[i];
-    }
-    return -ENOBUFS;
+  for (;;) {
+    int ret = xsk_ring_prod__reserve(&xi->tx, c->n_pkts, &idx);
+    if (ret == (int)c->n_pkts)
+      break;
+    afxdp_kick_tx(xi);
+  }
+
+  for (i = 0; i < c->n_pkts; i++) {
+    xsk_ring_prod__tx_desc(&xi->tx, idx + i)->addr = c->addr[i];
+    xsk_ring_prod__tx_desc(&xi->tx, idx + i)->len = c->len[i];
   }
 
   xsk_ring_prod__submit(&xi->tx, c->n_pkts);
+  afxdp_kick_tx(xi);
+
   xi->outstanding_tx += c->n_pkts;
   c->n_pkts = 0;
 
-  afxdp_kick_tx(xi);
   return 0;
 }

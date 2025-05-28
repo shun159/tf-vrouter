@@ -46,6 +46,18 @@
 
 #define BATCH_SIZE 32
 
+/* XDP section */
+
+#define XDP_FLAGS_UPDATE_IF_NOEXIST (1U << 0)
+#define XDP_FLAGS_SKB_MODE (1U << 1)
+#define XDP_FLAGS_DRV_MODE (1U << 2)
+#define XDP_FLAGS_HW_MODE (1U << 3)
+#define XDP_FLAGS_REPLACE (1U << 4)
+#define XDP_FLAGS_MODES                                                        \
+  (XDP_FLAGS_SKB_MODE | XDP_FLAGS_DRV_MODE | XDP_FLAGS_HW_MODE)
+#define XDP_FLAGS_MASK                                                         \
+  (XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_MODES | XDP_FLAGS_REPLACE)
+
 //  Buffer pool and buffer cache
 struct bpool_params {
   __u32 n_buffers;
@@ -251,12 +263,13 @@ static const struct xsk_socket_config xsk_cfg_default = {
     .rx_size = CONS_NUM_DESCS,
     .tx_size = PROD_NUM_DESCS,
     .libbpf_flags = 0,
-    .bind_flags = 0,
-    .xdp_flags = 0,
+    .bind_flags = XDP_USE_NEED_WAKEUP | XDP_COPY,
+    .xdp_flags = XDP_FLAGS_DRV_MODE,
 };
 
 struct vr_xpacket *afxdp_xpacket_from_pkt(struct vr_packet *pkt);
 struct vr_xdp_buf *vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt);
+struct afxdp_meta *vr_afxdp_pkt_to_afxdp_meta(struct vr_packet *pkt);
 struct vr_packet *vr_afxdp_xdp_buf_to_pkt(struct vr_xdp_buf *xdp_buf);
 struct vr_xdp_buf *afxdp_xdp_buf_copy(struct vr_xdp_buf *src, void *pool);
 void afxdp_xdp_buf_free(struct vr_xdp_buf *xdp_buf);

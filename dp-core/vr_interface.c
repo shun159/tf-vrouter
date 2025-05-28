@@ -1382,7 +1382,6 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt, unsigned short vlan_id)
   struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
 
   vr_init_forwarding_md(&fmd);
-  fprintf(stderr, "vm_rx");
   fmd.fmd_dvrf = vif->vif_vrf;
 
   vif_mirror(vif, pkt, &fmd, vif->vif_flags & VIF_FLAG_MIRROR_RX);
@@ -1574,7 +1573,6 @@ eth_mac_request(struct vr_interface *vif,
 static int
 eth_rx(struct vr_interface *vif, struct vr_packet *pkt, unsigned short vlan_id)
 {
-  fprintf(stderr, "eth_rx");
   struct vr_forwarding_md fmd;
   struct vr_interface *sub_vif = NULL;
   struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -1625,7 +1623,6 @@ eth_tx(struct vr_interface *vif,
        struct vr_packet *pkt,
        struct vr_forwarding_md *fmd)
 {
-  fprintf(stderr, "eth_tx");
   bool stats_count = true, from_subvif = false, force_tag = true;
   int ret, handled;
   uint16_t vlan_id;

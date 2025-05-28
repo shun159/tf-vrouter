@@ -23,6 +23,7 @@
 
 #include "vr_os.h"
 #include "vr_packet.h"
+#include "vr_debug.h"
 #include "vr_proto.h"
 #include "vrouter.h"
 #include "vr_message.h"
@@ -644,7 +645,6 @@ afxdp_adjust_tcp_mss(struct tcphdr *tcph, __u16 overlay_len, __u8 iph_len)
 static int
 afxdp_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, __u16 overlay_len)
 {
-  struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
   struct vr_ip *ip4h = NULL;
   struct vr_ip6 *ip6h = NULL;
   struct tcphdr *tcph;
@@ -655,11 +655,12 @@ afxdp_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, __u16 overlay_len)
   if (pkt->vp_type == VP_TYPE_IP) {
     offset = sizeof(struct vr_ip);
     if (pkt->vp_data + offset < pkt->vp_end)
-      ip4h = (struct vr_ip *)((uintptr_t)buf->buf_addr + pkt->vp_data);
+      ip4h = (struct vr_ip *)((uintptr_t)pkt->vp_head + pkt->vp_data);
     else {
       fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
       return -1;
     }
+
     iph_proto = ip4h->ip_proto;
     iph_len = ip4h->ip_hl * 4;
 
@@ -669,7 +670,7 @@ afxdp_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, __u16 overlay_len)
   } else if (pkt->vp_type == VP_TYPE_IP6) {
     iph_len = offset = sizeof(struct vr_ip6);
     if (pkt->vp_data + offset < pkt->vp_end)
-      ip6h = (struct vr_ip6 *)((uintptr_t)buf->buf_addr + pkt->vp_data);
+      ip6h = (struct vr_ip6 *)((uintptr_t)pkt->vp_head + pkt->vp_data);
     else {
       fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
       return -1;
@@ -847,6 +848,12 @@ get_random_bytes(void *buf, int nbytes)
   }
 }
 
+struct afxdp_meta *
+vr_afxdp_pkt_to_afxdp_meta(struct vr_packet *pkt)
+{
+  return (struct afxdp_meta *)((uintptr_t)pkt - sizeof(struct afxdp_meta));
+}
+
 //  vr_afxdp_pkt_to_xdp_buf - Convert a pointer to vr_packet into the associated
 //  vr_xdp_buf ptr
 struct vr_xdp_buf *
@@ -999,7 +1006,7 @@ vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
   pkt->vp_flags = 0;
   pkt->vp_ttl = 64;
   pkt->vp_type = VP_TYPE_NULL;
-  pkt->vp_queue = VP_QUEUE_INVALID;
+  pkt->vp_queue = queue_id;
   pkt->vp_priority = VP_PRIORITY_INVALID;
   pkt->vp_rx_pass = 0;
 

@@ -40,3 +40,15 @@
       (fmd)->fmd_to_me,                                                        \
       (be),                                                                    \
       (nh))
+
+#define DUMP_PKT(pkt)                                                          \
+  DBG("pkt=%p vp_data=%d vp_tail=%d vp_len=%d vp_end=%d "                      \
+      "vp_network_h=%d vp_inner_network_h=%d vp_cpu=%d",                       \
+      (pkt),                                                                   \
+      (pkt)->vp_data,                                                          \
+      (pkt)->vp_tail,                                                          \
+      (pkt)->vp_len,                                                           \
+      (pkt)->vp_end,                                                           \
+      (pkt)->vp_network_h,                                                     \
+      (pkt)->vp_inner_network_h,                                               \
+      (pkt)->vp_cpu);

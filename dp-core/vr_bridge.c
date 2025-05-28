@@ -825,6 +825,7 @@ vr_bridge_learn(struct vrouter *router,
 
   vr_sync_fetch_and_add_64u(&be->be_packets, 1);
 
+  trap = false;
   if (trap) {
     pkt_c = pkt_cow(pkt, 0);
     if (!pkt_c) {
@@ -857,10 +858,6 @@ vr_bridge_input(struct vrouter *router,
   struct vr_vrf_stats *stats = NULL;
   int mac_flags;
 
-  DBG("=== enter vr_bridge_input ===");
-
-  DUMP_BR(pkt, fmd, NULL, NULL);
-
   if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
     if (fmd->fmd_dscp < 0) {
       if (pkt->vp_type == VP_TYPE_IP) {
@@ -880,8 +877,6 @@ vr_bridge_input(struct vrouter *router,
   if (!fmd->fmd_to_me) {
     if ((pkt->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) ||
         (pkt->vp_nh && (pkt->vp_nh->nh_flags & NH_FLAG_MAC_LEARN))) {
-      DBG("after L4 special-handling  l4_type=%d", l4_type);
-
       ml_res =
           vr_bridge_learn(router, pkt, (struct vr_eth *)pkt_data(pkt), fmd);
       if (ml_res == MAC_TRAPPED)
@@ -954,7 +949,6 @@ vr_bridge_input(struct vrouter *router,
     }
 
     if ((mac_flags & MAC_BMC_BIT_SET) && (pkt->vp_if->vif_mcast_vrf != 65535)) {
-
       fmd->fmd_dvrf = pkt->vp_if->vif_mcast_vrf;
     }
 
@@ -962,7 +956,6 @@ vr_bridge_input(struct vrouter *router,
     lookup_mac = dmac;
     if (mac_flags & MAC_UC_BIT_SET) {
       be = bridge_lookup(lookup_mac, fmd);
-      DUMP_BR(pkt, fmd, be, nh);
 
     } else {
       if (pkt->vp_type == VP_TYPE_IP) {
@@ -994,19 +987,14 @@ vr_bridge_input(struct vrouter *router,
       nh = be->be_nh;
 
     if (!nh || nh->nh_type == NH_DISCARD) {
-      DBG("nh missing or DISCARD  mac_flags=0x%x", mac_flags);
-
       /* If Flooding of unknown unicast not allowed, drop the packet */
-      DBG("vr_unknown_uc_flood args  vif=%p, nh=%p", pkt->vp_if, pkt->vp_nh);
       if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
           (mac_flags & MAC_BMC_BIT_SET)) {
         PKT_LOG(VP_DROP_L2_NO_ROUTE, pkt, 0, VR_BRIDGE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-        DBG("vr_unknown_uc_flood: drop\n");
         return 0;
       }
 
-      DBG("calling bridge_lookup\n");
       be = bridge_lookup(vr_bcast_mac, fmd);
       if (!be || !(nh = be->be_nh)) {
         PKT_LOG(VP_DROP_L2_NO_ROUTE, pkt, 0, VR_BRIDGE_C, __LINE__);
@@ -1044,8 +1032,6 @@ vr_bridge_input(struct vrouter *router,
 
     if (vif_is_virtual(pkt->vp_if) && vr_from_vm_mss_adj &&
         vr_pkt_from_vm_tcp_mss_adj) {
-
-      DBG("calling vr_pkt_from_vm_tcp_mss_adj overlay_len=%u", overlay_len);
 
       if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
         PKT_LOG(reason, pkt, 0, VR_BRIDGE_C, __LINE__);
@@ -1085,9 +1071,7 @@ vr_bridge_input(struct vrouter *router,
     return 0;
   }
 
-  DBG("→ call nh_output");
   nh_output(pkt, nh, fmd);
-  DBG("=== leave vr_bridge_input ===");
 
   return 0;
 }

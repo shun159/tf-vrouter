@@ -670,12 +670,6 @@ vr_virtual_input(unsigned short vrf,
   bool check_trap_macipl = false;
   unsigned int ret = 0;
 
-  DBG("=== enter vr_virtual_input ===");
-
-  if (!fmd) {
-    DBG("fmd == NULL! early drop");
-  }
-
   fmd->fmd_vlan = vlan_id;
   fmd->fmd_dvrf = vrf;
   if (pkt->vp_priority != VP_PRIORITY_INVALID) {
@@ -687,12 +681,6 @@ vr_virtual_input(unsigned short vrf,
     vif_drop_pkt(vif, pkt, 1);
     return 0;
   }
-
-  DBG("vrf=%u vlan=%u vp_type=%u vp_flags=0x%x",
-      vrf,
-      vlan_id,
-      pkt->vp_type,
-      pkt->vp_flags);
 
   /*
    * we really do not allow any broadcast packets from interfaces
@@ -709,8 +697,6 @@ vr_virtual_input(unsigned short vrf,
   if (!fmd->fmd_to_me) {
     eth = (struct vr_eth *)pkt_data(pkt);
     router = vrouter_get(0);
-    DUMP_PTRS(pkt, fmd, router, router ? router->vr_inet_rtable : NULL);
-
     if ((pkt->vp_if->vif_flags & VIF_FLAG_MAC_IP_LEARNING) &&
         (pkt->vp_if->vif_flags & VIF_FLAG_L3_ENABLED) &&
         (pkt->vp_if->vif_flags & VIF_FLAG_L2_ENABLED)) {
@@ -724,8 +710,6 @@ vr_virtual_input(unsigned short vrf,
         vr_req.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
         vr_req.rtr_req.rtr_family = AF_INET;
         arp = (struct vr_arp *)(pkt_data(pkt) + sizeof(struct vr_eth));
-        DBG("handling ARP spa=%08x", arp->arp_spa);
-
         memcpy(vr_req.rtr_req.rtr_prefix,
                (uint8_t *)&arp->arp_spa,
                sizeof(arp->arp_spa));
@@ -769,7 +753,6 @@ vr_virtual_input(unsigned short vrf,
              * So comparing source mac with nh encap data and trap
              * to agent */
             nh = vrouter_get_nexthop(0, vr_req.rtr_nh->nh_id);
-            DBG("nh=%p nh_id=%u", nh, nh ? nh->nh_id : 0);
 
             if (nh && !(VR_MAC_CMP(eth->eth_smac, (nh->nh_data)))) {
               vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_MAC_IP_LEARNING, NULL);
@@ -778,8 +761,6 @@ vr_virtual_input(unsigned short vrf,
           }
         } else {
           vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_MAC_IP_LEARNING, NULL);
-          DBG("trap: MAC/IP learning miss-hit");
-
           return 0;
         }
       }
@@ -798,15 +779,10 @@ vr_virtual_input(unsigned short vrf,
     }
   }
 
-  DBG("calling vr_flow_forward");
   ret = vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd);
   if (!ret)
     return 0;
-  DBG("vr_flow_forward ret=%d", ret);
-
-  DBG("calling vr_bridge_input");
   ret = vr_bridge_input(vif->vif_router, pkt, fmd);
-  DBG("vr_bridge_input ret=%d", ret);
 
   return ret;
 }
