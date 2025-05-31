@@ -132,16 +132,16 @@ struct bcache {
 };
 
 static const struct xsk_umem_config umem_cfg_default = {
-    .fill_size = PROD_NUM_DESCS * 2,
-    .comp_size = CONS_NUM_DESCS,
-    .frame_size = NUM_FRAMES,
+    .fill_size = 4096,
+    .comp_size = 4096,
+    .frame_size = XSK_UMEM__DEFAULT_FRAME_SIZE,
     .frame_headroom = XSK_UMEM__DEFAULT_FRAME_HEADROOM,
     .flags = 0,
 };
 
 static const struct bpool_params bpool_params_default = {
     .n_buffers = 64 * 1024,
-    .buffer_size = NUM_FRAMES,
+    .buffer_size = XSK_UMEM__DEFAULT_FRAME_SIZE,
     .mmap_flags = 0,
     .n_users_max = 16,
     .n_buffers_per_slab = PROD_NUM_DESCS * 2,
@@ -260,8 +260,8 @@ struct vr_afxdp_tapdev {
 #define AFXDP_PKT_HEADROOM 128
 
 static const struct xsk_socket_config xsk_cfg_default = {
-    .rx_size = CONS_NUM_DESCS,
-    .tx_size = PROD_NUM_DESCS,
+    .rx_size = 4096,
+    .tx_size = 4096,
     .libbpf_flags = 0,
     .bind_flags = XDP_USE_NEED_WAKEUP | XDP_COPY,
     .xdp_flags = XDP_FLAGS_DRV_MODE,
@@ -310,6 +310,7 @@ struct vr_afxdp_global {
 };
 
 extern struct vr_afxdp_global vr_afxdp;
+extern struct bpool *bpool;
 
 extern int no_huge_set;
 

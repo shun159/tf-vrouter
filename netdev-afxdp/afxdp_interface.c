@@ -206,7 +206,24 @@ afxdp_init(void)
     return errno;
   }
 
+  struct bpool_params bpool_params;
+  struct xsk_umem_config umem_cfg;
+
+  memcpy(&bpool_params, &bpool_params_default, sizeof(struct bpool_params));
+  memcpy(&umem_cfg, &umem_cfg_default, sizeof(struct xsk_umem_config));
+
+  bpool = bpool_init(&bpool_params, &umem_cfg);
+  if (!bpool) {
+    fprintf(stderr, "bpool_init failed\n");
+    goto err;
+  }
+  fprintf(stdout, "Buffer pool created successfully.\n");
+
   return 0;
+
+err:
+  bpool_free(bpool);
+  return -1;
 }
 
 void
@@ -229,7 +246,7 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
   struct vr_afxdp_ethdev *ethdev;
   struct vr_afxdp_xsk_socket_info *xi;
   struct vr_afxdp_tx_cache *cache;
-  void *umem_elem;
+  struct afxdp_meta *m;
 
   if (!vif) {
     fprintf(stderr, "vif is NULL\n");
@@ -254,29 +271,19 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
   }
 
   cache = &xi->tx_cache;
+  m = vr_afxdp_pkt_to_afxdp_meta(pkt);
 
-  if (bcache_pop(xi->bcache, &umem_elem)) {
-    fprintf(stderr, "bcache_pop failed — dropping packet\n");
-    vif_drop_pkt(vif, pkt, 1);
-    return -ENOBUFS;
-  }
-
-  memcpy(umem_elem, pkt_data(pkt), pkt_len(pkt));
-  __u64 ofs = (__u8 *)umem_elem - (__u8 *)xi->bpool->addr;
-  cache->addr[cache->n_pkts] = ofs;
-  cache->len[cache->n_pkts] = pkt_len(pkt);
+  cache->addr[cache->n_pkts] = m->umem_addr;
+  cache->len[cache->n_pkts] = m->len;
   cache->n_pkts++;
 
   if (cache->n_pkts) { //== AFXDP_TX_BURST_SZ) {
     if (afxdp_tx_burst(xi, cache)) {
       fprintf(stderr, "[TX] afxdp_tx_burst failed\n");
-      bcache_push(xi->bcache, umem_elem);
       vif_drop_pkt(vif, pkt, 1);
       return -ENOBUFS;
     }
   }
-
-  vr_pfree(pkt, 0);
 
   return 0;
 }

@@ -990,6 +990,7 @@ vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
 
   struct afxdp_meta *m = (struct afxdp_meta *)(data - headroom);
   m->umem_addr = desc->addr;
+  m->len = desc->len;
   m->xsk = xsk;
 
   pkt = (struct vr_packet *)(m + 1);

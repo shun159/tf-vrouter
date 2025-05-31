@@ -47,7 +47,7 @@ afxdp_pkt_recycle(struct vr_packet *pkt)
   if (!xsk)
     return -EAGAIN;
 
-  struct xsk_ring_prod *fq = &xsk->bpool->umem_fq;
+  struct xsk_ring_prod *fq = &xsk->fq;
   int idx = xsk_ring_prod__reserve(fq, 1, &pos);
   if (idx < 0)
     return -ENOSPC;
@@ -60,18 +60,20 @@ afxdp_pkt_recycle(struct vr_packet *pkt)
 static int
 xsk_configure_umem(struct vr_afxdp_xsk_socket_info *xsk)
 {
-  struct xsk_umem_config umem_cfg;
   __u32 umem_fq_size = 0;
 
-  memcpy(&xsk->bpool_params,
-         &bpool_params_default,
-         sizeof(struct bpool_params));
-  memcpy(&umem_cfg, &umem_cfg_default, sizeof(struct xsk_umem_config));
-  xsk->bpool = bpool_init(&xsk->bpool_params, &umem_cfg);
+  xsk->bpool = bpool;
   if (!xsk->bpool) {
     fprintf(stderr, "bpool_init failed\n");
     goto err;
   }
+
+  memcpy(&xsk->bpool_params,
+         &bpool_params_default,
+         sizeof(struct bpool_params));
+  memcpy(&xsk->bpool->umem_cfg,
+         &umem_cfg_default,
+         sizeof(struct xsk_umem_config));
 
   umem_fq_size = xsk->bpool->umem_cfg.fill_size;
   xsk->bcache = bcache_init(xsk->bpool);
@@ -83,7 +85,6 @@ xsk_configure_umem(struct vr_afxdp_xsk_socket_info *xsk)
   return 0;
 
 err:
-  bpool_free(xsk->bpool);
   bcache_free(xsk->bcache);
   return -1;
 }
@@ -118,29 +119,31 @@ xsk_configure_queue(struct vr_afxdp_ethdev *ethdev, __u32 queue_id)
   }
 
   memcpy(&cfg, &xsk_cfg_default, sizeof(cfg));
-  ret = xsk_socket__create(&xsk_info->xsk,
-                           devname,
-                           queue_id,
-                           xsk_info->bpool->umem,
-                           &xsk_info->rx,
-                           &xsk_info->tx,
-                           &cfg);
+  ret = xsk_socket__create_shared(&xsk_info->xsk,
+                                  devname,
+                                  queue_id,
+                                  xsk_info->bpool->umem,
+                                  &xsk_info->rx,
+                                  &xsk_info->tx,
+                                  &xsk_info->fq,
+                                  &xsk_info->cq,
+                                  &cfg);
   if (ret) {
     fprintf(stderr, "xsk_socket__create failed %s\n", strerror(errno));
     goto err_free_umem;
   }
 
   umem_fq_size = xsk_info->bpool->umem_cfg.fill_size;
-  if (!xsk_ring_prod__reserve(&xsk_info->bpool->umem_fq, umem_fq_size, &idx)) {
+  if (!xsk_ring_prod__reserve(&xsk_info->fq, umem_fq_size, &idx)) {
     fprintf(stderr, "xsk_ring_prod__reserve (queue_id=%u) failed\n", queue_id);
     goto err_delete_socket;
   }
 
   for (i = 0; i < umem_fq_size; i++) {
     __u64 addr = bcache_cons(xsk_info->bcache);
-    *xsk_ring_prod__fill_addr(&xsk_info->bpool->umem_fq, idx + i) = addr;
+    *xsk_ring_prod__fill_addr(&xsk_info->fq, idx + i) = addr;
   }
-  xsk_ring_prod__submit(&xsk_info->bpool->umem_fq, umem_fq_size);
+  xsk_ring_prod__submit(&xsk_info->fq, umem_fq_size);
 
   xsk_info->available_rx = PROD_NUM_DESCS;
   xsk_info->outstanding_tx = 0;
@@ -222,38 +225,37 @@ xsk_destroy_all(struct vr_afxdp_ethdev *ethdev)
 }
 
 static inline void
-prepare_fill_queue(struct vr_afxdp_xsk_socket_info *xsk)
-{
-  __u32 n_pkts, i;
-  __u32 idx_fq;
-
-  n_pkts = bcache_cons_check(xsk->bcache, BATCH_SIZE);
-  if (!n_pkts)
-    return;
-  if (xsk_prod_nb_free(&xsk->bpool->umem_fq, BATCH_SIZE) < BATCH_SIZE)
-    return;
-  if (!xsk_ring_prod__reserve(&xsk->bpool->umem_fq, BATCH_SIZE, &idx_fq))
-    return;
-
-  for (i = 0; i < BATCH_SIZE; i++) {
-    __u64 addr = bcache_cons(xsk->bcache);
-    *xsk_ring_prod__fill_addr(&xsk->bpool->umem_fq, idx_fq + i) = addr;
-  }
-
-  xsk_ring_prod__submit(&xsk->bpool->umem_fq, BATCH_SIZE);
-  xsk->available_rx += BATCH_SIZE;
-}
-
-static inline void
 xsk_rx_wakeup_if_needed(struct vr_afxdp_xsk_socket_info *xsk)
 {
-  if (xsk_ring_prod__needs_wakeup(&xsk->bpool->umem_fq)) {
+  if (xsk_ring_prod__needs_wakeup(&xsk->fq)) {
     struct pollfd pollfd = {
         .fd = xsk_socket__fd(xsk->xsk),
         .events = POLLIN,
     };
     poll(&pollfd, 1, 0);
   }
+}
+
+static inline void
+prepare_fill_queue(struct vr_afxdp_xsk_socket_info *xsk, __u32 n_pkts)
+{
+  __u32 i;
+  __u32 idx_fq;
+
+  for (;;) {
+    int status = xsk_ring_prod__reserve(&xsk->fq, n_pkts, &idx_fq);
+    if (n_pkts == status)
+      break;
+    xsk_rx_wakeup_if_needed(xsk);
+  }
+
+  for (i = 0; i < n_pkts; i++) {
+    __u64 addr = bcache_cons(xsk->bcache);
+    *xsk_ring_prod__fill_addr(&xsk->fq, idx_fq + i) = addr;
+  }
+
+  xsk_ring_prod__submit(&xsk->fq, n_pkts);
+  xsk->available_rx += n_pkts;
 }
 
 int
@@ -275,17 +277,22 @@ afxdp_recv(struct vr_interface *vif, __u32 queue_id)
   if (!xsk)
     return -EAGAIN;
 
-  prepare_fill_queue(xsk);
+  rcvd = bcache_cons_check(xsk->bcache, BATCH_SIZE);
+  if (!rcvd)
+    return -EAGAIN;
 
-  rcvd = xsk_ring_cons__peek(&xsk->rx, BATCH_SIZE, &idx_rx);
+  rcvd = xsk_ring_cons__peek(&xsk->rx, rcvd, &idx_rx);
   if (!rcvd) {
     xsk_rx_wakeup_if_needed(xsk);
     return -EAGAIN;
   }
 
+  prepare_fill_queue(xsk, rcvd);
+
   for (i = 0; i < rcvd; i++) {
     const struct xdp_desc *desc = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx + i);
-    char *data = xsk_umem__get_data(xsk->bpool->addr, desc->addr);
+    __u64 addr = xsk_umem__add_offset_to_addr(desc->addr);
+    char *data = xsk_umem__get_data(xsk->bpool->addr, addr);
     pkt = vr_afxdp_get_packet(xsk, desc, vif, data, queue_id);
     if (!pkt) {
       fprintf(stderr, "failed to alloc pkt\n");
@@ -300,21 +307,21 @@ afxdp_recv(struct vr_interface *vif, __u32 queue_id)
   return rcvd;
 }
 
+// safer afxdp_tx_complete
 inline void
 afxdp_tx_complete(struct vr_afxdp_xsk_socket_info *xi)
 {
-  __u32 idx;
-  __u32 n = xsk_ring_cons__peek(&xi->bcache->bp->umem_cq, 64, &idx);
-  if (!n)
-    return;
+  __u32 idx, n_pkts;
 
-  for (__u32 i = 0; i < n; i++) {
-    __u64 addr = *xsk_ring_cons__comp_addr(&xi->bcache->bp->umem_cq, idx + i);
-    bcache_push(xi->bcache, (uint8_t *)xi->bpool->addr + addr);
+  n_pkts = umem_cfg_default.comp_size;
+  n_pkts = xsk_ring_cons__peek(&xi->cq, n_pkts, &idx);
+
+  for (__u32 i = 0; i < n_pkts; i++) {
+    __u64 addr = *xsk_ring_cons__comp_addr(&xi->cq, idx + i);
+    bcache_prod(xi->bcache, addr);
   }
 
-  xsk_ring_cons__release(&xi->bcache->bp->umem_cq, n);
-  xi->outstanding_tx -= n;
+  xsk_ring_cons__release(&xi->cq, n_pkts);
 }
 
 static inline void
@@ -334,7 +341,6 @@ afxdp_tx_burst(struct vr_afxdp_xsk_socket_info *xi, struct vr_afxdp_tx_cache *c)
     return 0;
 
   afxdp_tx_complete(xi);
-  afxdp_kick_tx(xi);
 
   for (;;) {
     int ret = xsk_ring_prod__reserve(&xi->tx, c->n_pkts, &idx);

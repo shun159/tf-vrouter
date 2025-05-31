@@ -29,6 +29,7 @@ __s32 get_nb_rxq_by_ifindex(__u32 ifindex);
 
 struct afxdp_meta {
   __u64 umem_addr;
+  __u64 len;
   struct vr_afxdp_xsk_socket_info *xsk;
 } __attribute__((packed));
 

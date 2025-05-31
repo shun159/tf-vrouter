@@ -31,3 +31,4 @@ __u64 bcache_cons(struct bcache *bc);
 void bcache_prod(struct bcache *bc, __u64 buffer);
 int bcache_pop(struct bcache *bc, void **elem);
 void bcache_push(struct bcache *bc, void *elem);
+void bcache_prod_flush(struct bcache *bc);

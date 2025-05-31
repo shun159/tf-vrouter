@@ -284,22 +284,3 @@ bcache_prod(struct bcache *bc, __u64 buffer)
   bc->slab_prod = slab_empty;
   bc->n_buffers_prod = 1;
 }
-
-inline int
-bcache_pop(struct bcache *bc, void **elem)
-{
-  if (bcache_cons_check(bc, 1) == 0) {
-    return -ENOBUFS;
-  }
-
-  __u64 addr = bcache_cons(bc);
-  *elem = (__u8 *)bc->bp->addr + addr;
-  return 0;
-}
-
-inline void
-bcache_push(struct bcache *bc, void *elem)
-{
-  __u64 addr = (__u8 *)elem - (__u8 *)bc->bp->addr;
-  bcache_prod(bc, addr);
-}

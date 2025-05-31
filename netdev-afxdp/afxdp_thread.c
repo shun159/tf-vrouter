@@ -13,13 +13,16 @@
  *
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <signal.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/eventfd.h>
+#include <sys/sysinfo.h>
 
 #include "vr_afxdp.h"
 #include "afxdp_thread.h"
@@ -41,6 +44,15 @@ static int g_ethdev_cnt;
 static void stop_static_threads(void);
 static void stop_dynamic_threads(void);
 static void destroy_all_ethdevs(void);
+
+void
+set_affinity_to_core(int core)
+{
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core, &cpuset);
+  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
 
 static volatile sig_atomic_t stop_req = 0;
 static void
@@ -73,6 +85,7 @@ void *
 afxdp_rx_thread_func(void *arg)
 {
   struct afxdp_rx_arg *rx = arg;
+  set_affinity_to_core(rx->vif->vif_os_idx % get_nprocs());
 
   while (!stop_req && !rx->ctrl->is_thr_stop)
     afxdp_recv(rx->vif, rx->queue_id);
