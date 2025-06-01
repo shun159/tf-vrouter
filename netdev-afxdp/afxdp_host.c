@@ -32,7 +32,6 @@
 #include "afxdp_interface.h"
 #include "afxdp_ethdev.h"
 #include "afxdp_host.h"
-#include "afxdp_global_umem.h"
 #include "host/vr_host_packet.h"
 #include "ulinux.h"
 
@@ -539,38 +538,6 @@ afxdp_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 static int
 afxdp_pcow(struct vr_packet **pktp, unsigned short head_room)
 {
-  struct vr_packet *new_pkt, *pkt = *pktp;
-  struct vr_xpacket *xpkt = NULL;
-
-  int data_len;
-  __u8 *new_data, *old_data;
-
-  if (head_room <= pkt->vp_data)
-    // We already have enough headroom—nothing to do
-    return 0;
-
-  xpkt = afxdp_global_pool_alloc_frame();
-  if (!xpkt)
-    return -ENOMEM;
-
-  new_pkt = &xpkt->pkt;
-  memset(new_pkt, 0, sizeof(*new_pkt));
-
-  *new_pkt = *pkt;
-  data_len = pkt->vp_tail - pkt->vp_data;
-
-  new_pkt->vp_data = head_room;
-  new_pkt->vp_tail = head_room + data_len;
-
-  new_data = (__u8 *)new_pkt->vp_head + new_pkt->vp_data;
-  old_data = (__u8 *)pkt->vp_head + pkt->vp_data;
-  memcpy(new_data, old_data, data_len);
-
-  *pktp = new_pkt;
-
-  struct vr_xpacket *xpkt_old = afxdp_xpacket_from_pkt(pkt);
-  afxdp_global_pool_free_frame(xpkt_old);
-
   return 0;
 }
 
@@ -901,54 +868,6 @@ __u32
 afxdp_desc_to_index(uint64_t addr)
 {
   return (__u32)(addr >> FRAME_SHIFT);
-}
-
-// alloc frame from global umem pool
-struct vr_xpacket *
-afxdp_global_pool_alloc_frame(void)
-{
-  if (!global_umem) {
-    return NULL;
-  }
-  if (global_umem->top == 0)
-    return NULL;
-
-  global_umem->top--;
-  void *frame = global_umem->frames[global_umem->top];
-
-  uintptr_t offset = (uintptr_t)frame - (uintptr_t)global_umem->buffer;
-  __u32 index = afxdp_desc_to_index(offset);
-
-  struct vr_xpacket *xpacket = &global_umem->meta_bufs[index];
-
-  memset(xpacket, 0, sizeof(*xpacket));
-
-  xpacket->xbuf.buf_addr = frame;
-  xpacket->xbuf.buf_len = FRAME_SIZE;
-  xpacket->xbuf.data_off = 0;
-  xpacket->xbuf.data_len = 0;
-
-  xpacket->pkt.vp_cpu = vr_get_cpu();
-  xpacket->pkt.vp_head = frame;
-
-  return xpacket;
-}
-
-// return frame buffer to global umem pool
-void
-afxdp_global_pool_free_frame(struct vr_xpacket *xpacket)
-{
-  if (!global_umem) {
-    return;
-  }
-  void *frame = xpacket->xbuf.buf_addr;
-  if (global_umem->top >= global_umem->n_frames)
-    return;
-
-  global_umem->frames[global_umem->top] = frame;
-  global_umem->top++;
-
-  memset(xpacket, 0, sizeof(*xpacket));
 }
 
 void

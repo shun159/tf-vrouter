@@ -36,7 +36,6 @@
 #include "afxdp_bcache.h"
 #include "afxdp_thread.h"
 #include "afxdp_interface.h"
-#include "afxdp_global_umem.h"
 #include "vr_afxdp.h"
 
 #define PAGE_SIZE 4096;
@@ -190,7 +189,6 @@ int
 afxdp_init(void)
 {
   struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
-  global_umem = NULL;
 
   // Allow unlimited locking of memory, so all memory needed for packet
   // buffers can be locked.
@@ -198,11 +196,6 @@ afxdp_init(void)
     fprintf(stderr,
             "ERROR: setrlimit(RLIMIT_MEMLOCK)  \"%s\"\n",
             strerror(errno));
-    return errno;
-  }
-
-  if (afxdp_global_umem_init()) {
-    fprintf(stderr, "ERROR: Can't create umem \"%s\"\n", strerror(errno));
     return errno;
   }
 
@@ -271,7 +264,6 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
   }
 
   m = vr_afxdp_pkt_to_afxdp_meta(pkt);
-
   cache = &xi->tx_cache;
   cache->addr[cache->n_pkts] = m->umem_addr;
   cache->len[cache->n_pkts] = m->len;

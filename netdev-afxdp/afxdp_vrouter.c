@@ -39,7 +39,6 @@ static int no_daemon_set = 0;
 extern char *ContrailBuildInfo;
 
 struct vr_afxdp_global vr_afxdp;
-struct xsk_umem_info *global_umem;
 struct bpool *bpool = NULL;
 
 /* vRouter/DPDK command-line options. */
