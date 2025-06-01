@@ -200,16 +200,6 @@ struct vr_xpacket {
   struct vr_packet pkt;
 };
 
-struct vr_afxdp_umem_info {
-  struct xsk_umem *umem;
-  struct xsk_ring_prod fq0;
-  struct xsk_ring_cons cq0;
-  __u32 nbfqs;
-  __u32 size;
-  void *buffer;
-  __u8 flags;
-};
-
 // tx burst cache
 #define AFXDP_TX_BURST_SZ 64
 
