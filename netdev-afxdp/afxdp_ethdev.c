@@ -332,29 +332,42 @@ afxdp_kick_tx(struct vr_afxdp_xsk_socket_info *xi)
   }
 }
 
-inline int
-afxdp_tx_burst(struct vr_afxdp_xsk_socket_info *xi, struct vr_afxdp_tx_cache *c)
+static inline void
+prepare_tx_queue(struct vr_afxdp_xsk_socket_info *xi,
+                 struct vr_afxdp_tx_cache *c)
 {
-  __u32 i, idx = 0;
-
-  if (!c->n_pkts)
-    return 0;
-
-  afxdp_tx_complete(xi);
+  struct xdp_desc *tx_desc;
+  __u32 i, idx_tx = 0;
+  __u32 pkts_to_send = c->n_pkts;
 
   for (;;) {
-    int ret = xsk_ring_prod__reserve(&xi->tx, c->n_pkts, &idx);
+    int ret = xsk_ring_prod__reserve(&xi->tx, c->n_pkts, &idx_tx);
     if (ret == (int)c->n_pkts)
       break;
     afxdp_kick_tx(xi);
   }
 
-  for (i = 0; i < c->n_pkts; i++) {
-    xsk_ring_prod__tx_desc(&xi->tx, idx + i)->addr = c->addr[i];
-    xsk_ring_prod__tx_desc(&xi->tx, idx + i)->len = c->len[i];
+  for (i = 0; i < pkts_to_send; i++) {
+    tx_desc = xsk_ring_prod__tx_desc(&xi->tx, idx_tx + i);
+    tx_desc->addr = c->addr[i];
+    tx_desc->len = c->len[i];
   }
 
-  xsk_ring_prod__submit(&xi->tx, c->n_pkts);
+  xsk_ring_prod__submit(&xi->tx, pkts_to_send);
+
+  return;
+}
+
+inline int
+afxdp_tx_burst(struct vr_afxdp_xsk_socket_info *xi, struct vr_afxdp_tx_cache *c)
+{
+  __u32 pkts_to_send = c->n_pkts;
+
+  if (!pkts_to_send)
+    return 0;
+
+  afxdp_tx_complete(xi);
+  prepare_tx_queue(xi, c);
   afxdp_kick_tx(xi);
 
   xi->outstanding_tx += c->n_pkts;

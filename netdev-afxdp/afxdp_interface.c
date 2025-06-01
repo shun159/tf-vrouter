@@ -270,9 +270,9 @@ afxdp_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     return -EINVAL;
   }
 
-  cache = &xi->tx_cache;
   m = vr_afxdp_pkt_to_afxdp_meta(pkt);
 
+  cache = &xi->tx_cache;
   cache->addr[cache->n_pkts] = m->umem_addr;
   cache->len[cache->n_pkts] = m->len;
   cache->n_pkts++;

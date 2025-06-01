@@ -85,7 +85,7 @@ void *
 afxdp_rx_thread_func(void *arg)
 {
   struct afxdp_rx_arg *rx = arg;
-  set_affinity_to_core(rx->vif->vif_os_idx % get_nprocs());
+  set_affinity_to_core(rx->vif->vif_idx % get_nprocs());
 
   while (!stop_req && !rx->ctrl->is_thr_stop)
     afxdp_recv(rx->vif, rx->queue_id);
