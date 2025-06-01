@@ -162,7 +162,10 @@ bcache_init(struct bpool *bp)
   bc->n_buffers_prod = 0;
 
   pthread_mutex_lock(&bp->lock);
-  if (bp->n_slabs_reserved_available == 0) {
+  if (bp->n_slabs_reserved_available < 2) {
+    fprintf(stderr,
+            "bcache_init: Not enough reserved slabs. Need 2, have %llu\n",
+            bp->n_slabs_reserved_available);
     pthread_mutex_unlock(&bp->lock);
     free(bc);
     return NULL;
@@ -275,6 +278,14 @@ bcache_prod(struct bcache *bc, __u64 buffer)
    */
   pthread_mutex_lock(&bp->lock);
   n_slabs_available = bp->n_slabs_available;
+
+  if (n_slabs_available >= bp->n_slabs) {
+    pthread_mutex_unlock(&bp->lock);
+    fprintf(stderr,
+            "bcache_prod: No empty slabs available in the pool to swap with.");
+    return;
+  }
+
   slab_empty = bp->slabs[n_slabs_available];
   bp->slabs[n_slabs_available] = bc->slab_prod;
   bp->n_slabs_available = n_slabs_available + 1;
