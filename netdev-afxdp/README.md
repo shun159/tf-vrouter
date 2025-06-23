@@ -1,7 +1,7 @@
 # AF_XDP vRouter – Datapath Architecture & Development Notes
 
-> **Status:** Evolving Draft (Last Updated: 2025-06-01)
-> **Next Major Goal:** Introduction of a consolidated forwarding thread model.
+> **Status:** Evolving Draft (Last Updated: 2025-06-23)
+> **Next Major Goal:** Introduction of a consolidated forwarding thread model. -> done
 
 ---
 
@@ -103,19 +103,38 @@ To address the challenges of the per-queue thread model and improve scalability,
 
 ## 6. Consolidated Forwarding Thread Model – io_uring Implementation (June 2025)
 
-6.1 Overview of Changes
+### 6.1 Overview of Changes
 
 | Feature                    | Per-Queue Thread model           | v2: io\_uring Forwarding Loops                    |
 | -------------------------- | --------------------------------- | ------------------------------------------------------------------- |
 | Thread Count               | Scales with number of queues      | Fixed at **NUM\_FWD\_THREADS** (default: 4)                         |
 | I/O Mechanism              | `poll()` with busy loop           | `IORING_OP_POLL_ADD` with `MULTI`                                   |
 | Dynamic Queue Registration | Spawns a thread per queue         | Uses `eventfd` to wake up forwarding loop                           |
-| TX Kick Behavior           | `sendto()` called for every batch | Kick once if `needs_wakeup` is true                                 |
 | CPU Usage (64 queues)      | 64 threads                        | **4 threads**                                                       |
 | I/O CQ Handling            | Direct per-thread `poll()` loop   | Centralized `io_uring_submit_and_wait()` loop with per-CQE dispatch |
 
+### 6.2 Why I moved to *io_uring* instead of pure busy polling method
 
-### 6.2 Architecture Diagram
+* **Fewer syscalls**  
+  Using *io_uring* we issue a single `io_uring_enter()` and harvest
+  many CQEs at once, drastically cutting user/kernel crossings.
+
+* **Fewer context switches**  
+  Busy-polling spins one thread per queue, so the scheduler switches
+  hundreds of times per second as queue count grows.  
+  A fixed set of (for example) four *io_uring* loops keeps the switch
+  rate bounded and avoids IRQ contention.
+
+* **Lower kernel overhead**  
+  `poll()` must walk a list of fds on every call.  
+  With *io_uring* the kernel simply writes CQEs into the shared ring;
+  no poll-list traversal is needed.
+
+* **Scales cleanly**  
+  Fixed thread counts make CPU pinning and capacity planning straightforward.
+
+
+### 6.2 Diagram
 
 ```mermaid
 flowchart LR
@@ -129,13 +148,9 @@ flowchart LR
     end
 
     subgraph Control_Plane
-        Netlink["Netlink thread"]
-        VIF["vif object"]
-        Pending["pending list"]
-
-        Netlink --> VIF
-        VIF -->|afxdp_rx_register()| Pending
-        Pending -->|eventfd write| L0
+        Netlink["Netlink thread"] --> VIF["vif object"]
+        VIF -- "afxdp_rx_register()" --> Pending["pending list"]
+        Pending -- "eventfd write" --> L0
     end
 ```
 
