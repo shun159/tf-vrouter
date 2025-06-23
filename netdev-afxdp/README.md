@@ -100,3 +100,54 @@ To address the challenges of the per-queue thread model and improve scalability,
 *(Further details, design choices, and implementation notes for the forwarding thread model will be added as development progresses.)*
 
 ---
+
+## 6. Consolidated Forwarding Thread Model – io_uring Implementation (June 2025)
+
+6.1 Overview of Changes
+
+| Feature                    | Per-Queue Thread model           | v2: io\_uring Forwarding Loops                    |
+| -------------------------- | --------------------------------- | ------------------------------------------------------------------- |
+| Thread Count               | Scales with number of queues      | Fixed at **NUM\_FWD\_THREADS** (default: 4)                         |
+| I/O Mechanism              | `poll()` with busy loop           | `IORING_OP_POLL_ADD` with `MULTI`                                   |
+| Dynamic Queue Registration | Spawns a thread per queue         | Uses `eventfd` to wake up forwarding loop                           |
+| TX Kick Behavior           | `sendto()` called for every batch | Kick once if `needs_wakeup` is true                                 |
+| CPU Usage (64 queues)      | 64 threads                        | **4 threads**                                                       |
+| I/O CQ Handling            | Direct per-thread `poll()` loop   | Centralized `io_uring_submit_and_wait()` loop with per-CQE dispatch |
+
+
+### 6.2 Architecture Diagram
+
+```mermaid
+flowchart LR
+    subgraph Forwarding_Loops
+        direction LR
+        L0["Loop 0 (io_uring)"] -.-> XSK0["XSK fd 0"]
+        L0 -.-> XSK1["XSK fd 1"]
+        L1["Loop 1"] -.-> XSK2["XSK fd 2"]
+        L2["Loop 2"]
+        L3["Loop 3"]
+    end
+
+    subgraph Control_Plane
+        Netlink["Netlink thread"]
+        VIF["vif object"]
+        Pending["pending list"]
+
+        Netlink --> VIF
+        VIF -->|afxdp_rx_register()| Pending
+        Pending -->|eventfd write| L0
+    end
+```
+
+- XSK registration: When a VIF is added, afxdp_rx_register() assigns the XSK to a forwarding thread with the fewest active queues.
+- Thread wake-up: The registration also writes to the corresponding eventfd.
+- Pending queue: The forwarding thread consumes newly registered queues from a pending list protected by a mutex.
+- I/O Handling: All XSK FDs are registered via IORING_OP_POLL_ADD with MULTI, so no re-submission is required unless IORING_CQE_F_MORE is missing.
+
+## 7. Updated Performance (veth, MTU 1500)
+
+| Metric                     | Per-Queue Thread Model | io\_uring Forwarding Loops |
+| -------------------------- | ---------------------- | -------------------------- |
+| `iperf3 -c <IP> -Z -t 10s` | **4.7 Gb/s**           | **6–7 Gb/s**           |
+| CPU Usage                  | \~100% per thread      | \~65% across 4 threads     |
+

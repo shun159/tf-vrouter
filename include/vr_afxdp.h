@@ -27,6 +27,7 @@
 #include <xdp/libxdp.h>
 #include <xdp/xsk.h>
 #include <urcu-qsbr.h>
+#include <liburing.h>
 
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)

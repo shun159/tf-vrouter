@@ -33,7 +33,7 @@ env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 env.Append(CPPPATH = [os.path.join('#', 'vrouter', 'include'),
                       os.path.join('#', 'vrouter', 'sandesh', 'gen-c')])
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
-env.Append(LIBS=['bpf', 'elf', 'xdp', 'z', 'dl', 'pthread', 'rt', 'urcu-qsbr', 'urcu-bp'])
+env.Append(LIBS=['bpf', 'elf', 'xdp', 'z', 'dl', 'pthread', 'rt', 'urcu-qsbr', 'urcu-bp', 'uring'])
 
 afxdp_objs = env.Object(Glob('*.c'))
 vrouter = env.Program('contrail-vrouter-afxdp', afxdp_objs)

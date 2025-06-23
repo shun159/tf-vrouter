@@ -149,20 +149,13 @@ afxdp_veth_if_add(struct vr_interface *vif)
   ethdev->num_queues = get_nb_rxq_by_ifindex(ethdev->os_ifidx);
 
   for (__u32 qid = 0; qid < ethdev->num_queues; qid++) {
-    struct afxdp_thread *t = NULL;
     struct afxdp_rx_arg *arg = calloc(1, sizeof(*arg));
     if (!arg)
       continue;
 
     arg->vif = vif;
     arg->queue_id = qid;
-
-    t = spawn_dynamic_thread(afxdp_rx_thread_func, arg, VR_AFXDP_THREAD_FWD);
-    if (!t) {
-      free(arg);
-      continue;
-    }
-    arg->ctrl = t;
+    afxdp_rx_register(arg);
   }
 
   return 0;
