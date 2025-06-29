@@ -254,7 +254,7 @@ static const struct xsk_socket_config xsk_cfg_default = {
     .rx_size = 4096,
     .tx_size = 4096,
     .libbpf_flags = 0,
-    .bind_flags = XDP_USE_NEED_WAKEUP | XDP_COPY,
+    .bind_flags = XDP_COPY,
     .xdp_flags = XDP_FLAGS_DRV_MODE,
 };
 

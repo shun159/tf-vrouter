@@ -48,10 +48,10 @@
 #include "vr_message.h"
 #include "vr_mem.h"
 
-#define TABLE_FLAG_VALID        0x1
+#define TABLE_FLAG_VALID 0x1
 
-#define MAX_FLOW_NL_MSG_BUNCH   15
-#define MAX_FLOWS               4000000
+#define MAX_FLOW_NL_MSG_BUNCH 15
+#define MAX_FLOWS 4000000
 
 static int mem_fd;
 
@@ -63,7 +63,7 @@ static unsigned long flow_index;
 static int rate, stats, perf, flush, bunch = 1;
 static bool more = false;
 
-#define FLOW_GET_FIELD_LENGTH   30
+#define FLOW_GET_FIELD_LENGTH 30
 #define FLOW_COMPONENT_NH_COUNT 16
 
 char src_vif_name[IFNAMSIZ];
@@ -128,15 +128,13 @@ struct flow_md {
     unsigned int fmd_gen_id;
 };
 
-
 struct nl_client *cl;
 vr_flow_req flow_req;
 vr_flow_table_data ftable;
 static struct flow_md flow_md_mem[MAX_FLOWS];
 static int array_index;
 
-static void flow_dump_nexthop(vr_nexthop_req *, vr_interface_req *,
-        char *, bool);
+static void flow_dump_nexthop(vr_nexthop_req *, vr_interface_req *, char *, bool);
 static vr_nexthop_req *flow_get_nexthop(int);
 static int flow_table_map(vr_flow_table_data *);
 static int flow_table_get(void);
@@ -165,7 +163,6 @@ flow_response_process(void *sresp)
     flow_md_mem[array_index].fmd_gen_id = resp->fresp_gen_id;
     return;
 }
-
 
 static void
 flow_table_data_process(void *sreq)
@@ -332,8 +329,7 @@ flow_get_route(unsigned int family, unsigned int vrf, uint8_t *prefix)
     if (family == AF_BRIDGE) {
         ret = vr_send_route_get(cl, 0, vrf, family, NULL, 0, req_mac);
     } else {
-        ret = vr_send_route_get(cl, 0, vrf, family, req_prefix,
-                prefix_size * 8, req_mac);
+        ret = vr_send_route_get(cl, 0, vrf, family, req_prefix, prefix_size * 8, req_mac);
     }
 
     if (ret < 0)
@@ -434,8 +430,10 @@ flow_dump_legend(void)
     printf("L=Link Local Port)\n");
 
     printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
-    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified Dm=Delete Marked\n");
-    printf("TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, D=Dead\n");
+    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified "
+           "Dm=Delete Marked\n");
+    printf("TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, "
+           "D=Dead\n");
     printf("\n");
 
     return;
@@ -447,8 +445,7 @@ flow_match_dest(struct vr_flow_entry *fe, uint8_t *addr, int32_t port)
     if (!addr && (port < 0))
         return false;
 
-    if (!memcmp(&fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
-                addr, match_family_size)) {
+    if (!memcmp(&fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)], addr, match_family_size)) {
         if (port < 0)
             return true;
         if (ntohs(fe->fe_key.flow_dport) == port)
@@ -501,8 +498,7 @@ flow_print_field_name(const char *field)
 static void
 flow_print_nh_header(vr_nexthop_req *nh)
 {
-    printf("NextHop(Index, VRF, Type): %u, %u, ",
-            nh->nhr_id, nh->nhr_vrf);
+    printf("NextHop(Index, VRF, Type): %u, %u, ", nh->nhr_id, nh->nhr_vrf);
     printf("%s", vr_nexthop_type_string(nh));
     printf("\n");
     return;
@@ -517,34 +513,29 @@ flow_print_vif(vr_interface_req *vif, char *vif_name, bool ingress)
             printf("Ingress ");
         else
             printf("Egress ");
-        printf("Interface(Index, VRF, OS): vif0/%u, %d, %s\n",
-                vif->vifr_idx, vif->vifr_vrf, vif_name);
+        printf("Interface(Index, VRF, OS): vif0/%u, %d, %s\n", vif->vifr_idx, vif->vifr_vrf, vif_name);
 
         flow_print_spaces();
         printf("Interface Statistics(Out, In, Errors): %" PRIu64 ", %" PRIu64 ", %" PRIu64 "\n",
-                vif->vifr_opackets, vif->vifr_ipackets,
-                vif->vifr_ierrors + vif->vifr_oerrors);
+               vif->vifr_opackets,
+               vif->vifr_ipackets,
+               vif->vifr_ierrors + vif->vifr_oerrors);
     }
 
     return;
 }
 
 static void
-flow_dump_tunnel(vr_nexthop_req *nh, vr_interface_req *vif,
-       char *vif_name, bool ingress)
+flow_dump_tunnel(vr_nexthop_req *nh, vr_interface_req *vif, char *vif_name, bool ingress)
 {
     if (nh) {
         flow_print_nh_header(nh);
         flow_print_spaces();
         printf("Tunnel Source: ");
         if (nh->nhr_family == AF_INET) {
-            printf("%s\n",
-                    inet_ntop(nh->nhr_family, &nh->nhr_tun_dip,
-                        addr_string, sizeof(addr_string)));
+            printf("%s\n", inet_ntop(nh->nhr_family, &nh->nhr_tun_dip, addr_string, sizeof(addr_string)));
         } else if (nh->nhr_family == AF_INET6) {
-            printf("%s\n",
-                    inet_ntop(nh->nhr_family, nh->nhr_tun_dip6,
-                        addr_string, sizeof(addr_string)));
+            printf("%s\n", inet_ntop(nh->nhr_family, nh->nhr_tun_dip6, addr_string, sizeof(addr_string)));
         }
     }
 
@@ -553,8 +544,7 @@ flow_dump_tunnel(vr_nexthop_req *nh, vr_interface_req *vif,
 }
 
 static void
-flow_dump_composite(vr_nexthop_req *nh, vr_interface_req *vif,
-        char *vif_name, bool ingress)
+flow_dump_composite(vr_nexthop_req *nh, vr_interface_req *vif, char *vif_name, bool ingress)
 {
     unsigned int i;
 
@@ -586,8 +576,7 @@ flow_dump_composite(vr_nexthop_req *nh, vr_interface_req *vif,
 }
 
 static void
-flow_dump_encap(vr_nexthop_req *nh, vr_interface_req *vif,
-        char *vif_name, bool ingress)
+flow_dump_encap(vr_nexthop_req *nh, vr_interface_req *vif, char *vif_name, bool ingress)
 {
     flow_print_nh_header(nh);
     flow_print_vif(vif, vif_name, ingress);
@@ -596,8 +585,7 @@ flow_dump_encap(vr_nexthop_req *nh, vr_interface_req *vif,
 }
 
 static void
-flow_dump_nexthop(vr_nexthop_req *src, vr_interface_req *vif,
-        char *vif_name, bool ingress)
+flow_dump_nexthop(vr_nexthop_req *src, vr_interface_req *vif, char *vif_name, bool ingress)
 {
     if (src) {
         switch (src->nhr_type) {
@@ -639,11 +627,9 @@ flow_dump_mirror(vr_nexthop_req *req)
         flow_print_spaces();
         printf("To Destination ");
         if (req->nhr_family == AF_INET) {
-            printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_dip,
-                        addr_string, sizeof(addr_string)));
+            printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_dip, addr_string, sizeof(addr_string)));
         } else if (req->nhr_family == AF_INET6) {
-            printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_dip6,
-                        addr_string, sizeof(addr_string)));
+            printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_dip6, addr_string, sizeof(addr_string)));
         }
 
         if (req->nhr_vrf < 0)
@@ -656,11 +642,9 @@ flow_dump_mirror(vr_nexthop_req *req)
         } else {
             printf("Tunnel Source IP ");
             if (req->nhr_family == AF_INET) {
-                printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_sip,
-                        addr_string, sizeof(addr_string)));
+                printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_sip, addr_string, sizeof(addr_string)));
             } else if (req->nhr_family == AF_INET6) {
-                printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_sip6,
-                            addr_string, sizeof(addr_string)));
+                printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_sip6, addr_string, sizeof(addr_string)));
             }
         }
     } else {
@@ -669,7 +653,6 @@ flow_dump_mirror(vr_nexthop_req *req)
 
     return;
 }
-
 
 static uint64_t
 flow_sum_drops_stats(vr_drop_stats_req *req)
@@ -712,11 +695,11 @@ flow_dump_entry(struct vr_flow_entry *fe)
         rfe = flow_get(fe->fe_rflow);
         if (rfe) {
             if ((rfe->fe_type == VP_TYPE_IP) || (rfe->fe_type == VP_TYPE_IP6)) {
-                inet_ntop(VR_FLOW_FAMILY(rfe->fe_type), rfe->fe_key.flow_ip,
-                        in_rsrc, sizeof(in_rsrc));
+                inet_ntop(VR_FLOW_FAMILY(rfe->fe_type), rfe->fe_key.flow_ip, in_rsrc, sizeof(in_rsrc));
                 inet_ntop(VR_FLOW_FAMILY(rfe->fe_type),
-                        &rfe->fe_key.flow_ip[VR_IP_ADDR_SIZE(rfe->fe_type)],
-                        in_rdest, sizeof(in_rdest));
+                          &rfe->fe_key.flow_ip[VR_IP_ADDR_SIZE(rfe->fe_type)],
+                          in_rdest,
+                          sizeof(in_rdest));
             }
         }
 
@@ -726,13 +709,12 @@ flow_dump_entry(struct vr_flow_entry *fe)
     printf("\n");
 
     if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-        inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip,
-                in_src, sizeof(in_src));
+        inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip, in_src, sizeof(in_src));
         inet_ntop(VR_FLOW_FAMILY(fe->fe_type),
-                &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
-                in_dest, sizeof(in_dest));
+                  &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
+                  in_dest,
+                  sizeof(in_dest));
     }
-
 
     flow_print_field_name("VRF");
     printf("%d\n", fe->fe_vrf);
@@ -754,7 +736,7 @@ flow_dump_entry(struct vr_flow_entry *fe)
     flow_print_field_name("Flow Protocol");
     printf("%s\n", vr_proto_string(fe->fe_key.flow_proto));
 
-    if(fe->fe_underlay_ecmp_index >= 0) {
+    if (fe->fe_underlay_ecmp_index >= 0) {
         flow_print_field_name("Flow Underlay ECMP Index");
         printf("%d\n", fe->fe_underlay_ecmp_index);
     }
@@ -836,18 +818,16 @@ flow_dump_entry(struct vr_flow_entry *fe)
         flow_dump_source(src_nh);
     }
 
-
     if (src_l3_rt) {
         flow_print_field_name("Source Information");
         printf("VRF: %u\n", src_l3_rt->rtr_vrf_id);
-        address_mask(src_l3_rt->rtr_prefix, src_l3_rt->rtr_prefix_len,
-                src_l3_rt->rtr_family);
+        address_mask(src_l3_rt->rtr_prefix, src_l3_rt->rtr_prefix_len, src_l3_rt->rtr_family);
         flow_print_spaces();
         printf("Layer 3 Route Information\n");
         flow_print_spaces();
         printf("Matching Route: %s/%-2d\n",
-                inet_ntop(src_l3_rt->rtr_family, src_l3_rt->rtr_prefix, in_rt,
-                    sizeof(in_rt)), src_l3_rt->rtr_prefix_len);
+               inet_ntop(src_l3_rt->rtr_family, src_l3_rt->rtr_prefix, in_rt, sizeof(in_rt)),
+               src_l3_rt->rtr_prefix_len);
         if (src_l3_nh) {
             flow_print_spaces();
             flow_dump_nexthop(src_l3_nh, src_l3_vif, src_l3_vif_name, true);
@@ -865,20 +845,18 @@ flow_dump_entry(struct vr_flow_entry *fe)
                 flow_dump_nexthop(src_l2_nh, src_l2_vif, src_l2_vif_name, true);
             }
         }
-
     }
 
     if (dst_l3_rt) {
         flow_print_field_name("Destination Information");
         printf("VRF: %u\n", dst_l3_rt->rtr_vrf_id);
-        address_mask(dst_l3_rt->rtr_prefix, dst_l3_rt->rtr_prefix_len,
-                dst_l3_rt->rtr_family);
+        address_mask(dst_l3_rt->rtr_prefix, dst_l3_rt->rtr_prefix_len, dst_l3_rt->rtr_family);
         flow_print_spaces();
         printf("Layer 3 Route Information\n");
         flow_print_spaces();
         printf("Matching Route: %s/%-2d\n",
-                inet_ntop(dst_l3_rt->rtr_family, dst_l3_rt->rtr_prefix, in_rt,
-                    sizeof(in_rt)), dst_l3_rt->rtr_prefix_len);
+               inet_ntop(dst_l3_rt->rtr_family, dst_l3_rt->rtr_prefix, in_rt, sizeof(in_rt)),
+               dst_l3_rt->rtr_prefix_len);
         if (dst_l3_nh) {
             flow_print_spaces();
             flow_dump_nexthop(dst_l3_nh, dst_l3_vif, dst_l3_vif_name, false);
@@ -896,7 +874,6 @@ flow_dump_entry(struct vr_flow_entry *fe)
                 flow_dump_nexthop(dst_l2_nh, dst_l2_vif, dst_l2_vif_name, false);
             }
         }
-
     }
 
     printf("\n");
@@ -948,7 +925,6 @@ flow_dump_entry(struct vr_flow_entry *fe)
         if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
             printf(", %d, ", fe->fe_sec_mirror_id);
 
-
         if (mirror_nh) {
             flow_print_field_name("Primary Mirror");
             flow_dump_mirror(mirror_nh);
@@ -986,7 +962,6 @@ flow_get_routes(struct vr_flow_entry *fe)
         rfe = flow_get(fe->fe_rflow);
         if (!rfe)
             return;
-
     }
 
     vrf = fe->fe_vrf;
@@ -1018,8 +993,7 @@ flow_get_routes(struct vr_flow_entry *fe)
     if (fe->fe_flags & VR_FLOW_FLAG_DNAT) {
         dst_l3_rt = flow_get_route(family, vrf, rfe->fe_key.flow_ip);
     } else {
-        dst_l3_rt = flow_get_route(family, vrf,
-                &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)]);
+        dst_l3_rt = flow_get_route(family, vrf, &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)]);
     }
 
     if (dst_l3_rt) {
@@ -1084,8 +1058,7 @@ flow_get_source(struct vr_flow_entry *fe)
                             if (i >= FLOW_COMPONENT_NH_COUNT)
                                 break;
 
-                            component_nh[i] =
-                                flow_get_nexthop(src_nh->nhr_nh_list[i]);
+                            component_nh[i] = flow_get_nexthop(src_nh->nhr_nh_list[i]);
                         }
                     }
                 }
@@ -1193,11 +1166,15 @@ flow_dump_table(struct flow_table *ft)
     char addr[INET6_ADDRSTRLEN];
     bool smatch, dmatch;
 
-    printf("Flow table(size %" PRIu64 ", entries %u)\n\n", ft->ft_span,
-            ft->ft_num_entries);
-    printf("Entries: Created %" PRIu64 " Added %" PRIu64 " Deleted %" PRIu64 " Changed %" PRIu64 "Processed %" PRIu64 " Used Overflow entries %u\n",
-            ft->ft_created, ft->ft_added, ft->ft_deleted, ft->ft_changed,
-            ft->ft_processed, ft->ft_oflow_entries);
+    printf("Flow table(size %" PRIu64 ", entries %u)\n\n", ft->ft_span, ft->ft_num_entries);
+    printf("Entries: Created %" PRIu64 " Added %" PRIu64 " Deleted %" PRIu64 " Changed %" PRIu64 "Processed %" PRIu64
+           " Used Overflow entries %u\n",
+           ft->ft_created,
+           ft->ft_added,
+           ft->ft_deleted,
+           ft->ft_changed,
+           ft->ft_processed,
+           ft->ft_oflow_entries);
 
     printf("(Created Flows/CPU: ");
     for (i = 0; i < ft->ft_hold_stat_count; i++) {
@@ -1276,11 +1253,9 @@ flow_dump_table(struct flow_table *ft)
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
 
-            if ((fe->fe_flags & VR_FLOW_FLAG_EVICTED) &&
-                    !show_evicted_set) {
+            if ((fe->fe_flags & VR_FLOW_FLAG_EVICTED) && !show_evicted_set) {
                 continue;
             }
-
 
             if (match_vrf >= 0) {
                 if (fe->fe_vrf != match_vrf)
@@ -1319,7 +1294,6 @@ flow_dump_table(struct flow_table *ft)
                         if (!smatch) {
                             dmatch = flow_match_dest(fe, match_ip2, match_port2);
                         }
-
                     }
                 }
 
@@ -1333,13 +1307,12 @@ flow_dump_table(struct flow_table *ft)
                 }
             }
 
-
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip,
-                            in_src, sizeof(in_src));
+                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip, in_src, sizeof(in_src));
                 inet_ntop(VR_FLOW_FAMILY(fe->fe_type),
-                      &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
-                      in_dest, sizeof(in_dest));
+                          &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
+                          in_dest,
+                          sizeof(in_dest));
             }
 
             printf("%9d", i);
@@ -1394,8 +1367,7 @@ flow_dump_table(struct flow_table *ft)
                 action = 'N';
                 need_flag_print = 1;
                 fi = 0;
-                for (j = 0; (j < (sizeof(fe->fe_flags) * 8)) &&
-                        fi < sizeof(flag_string); j++)
+                for (j = 0; (j < (sizeof(fe->fe_flags) * 8)) && fi < sizeof(flag_string); j++)
                     switch ((1 << j) & fe->fe_flags) {
                     case VR_FLOW_FLAG_SNAT:
                         flag_string[fi++] = 'S';
@@ -1482,8 +1454,7 @@ flow_dump_table(struct flow_table *ft)
             printed += printf("QOS:%d, ", fe->fe_qos_id);
             printed += printf("S(nh):%u, ", fe->fe_src_nh_index);
             printed = print_new_line_if_required(printed, 70);
-            printed += printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets,
-                    fe->fe_stats.flow_bytes);
+            printed += printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets, fe->fe_stats.flow_bytes);
             printed = print_new_line_if_required(printed, 70);
 
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
@@ -1498,7 +1469,7 @@ flow_dump_table(struct flow_table *ft)
             printed = print_new_line_if_required(printed, 70);
             printf(" TTL %d,", fe->fe_ttl);
             printed = print_new_line_if_required(printed, 70);
-            if(fe->fe_underlay_ecmp_index >= 0) {
+            if (fe->fe_underlay_ecmp_index >= 0) {
                 printf(" UnderlayEcmpIdx:%d,", fe->fe_underlay_ecmp_index);
                 printed = print_new_line_if_required(printed, 70);
             }
@@ -1514,8 +1485,7 @@ flow_dump_table(struct flow_table *ft)
         j = -1;
         next_index = fe->fe_hentry.hentry_next_index;
         while (next_index != VR_INVALID_HENTRY_INDEX) {
-            ofe = (struct vr_flow_entry *)((char *)ft->ft_entries +
-                        (next_index * sizeof(*fe)));
+            ofe = (struct vr_flow_entry *)((char *)ft->ft_entries + (next_index * sizeof(*fe)));
             if (j == -1) {
                 if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
                     printf("%6d", i);
@@ -1530,8 +1500,9 @@ flow_dump_table(struct flow_table *ft)
             }
 
             next_index = ofe->fe_hentry.hentry_next_index;
-            /* CEM-24972: memory mapped area for flow is pointing to incorrect memory location so next_index coming as 0 */
-            if(!next_index) {
+            /* CEM-24972: memory mapped area for flow is pointing to incorrect memory
+             * location so next_index coming as 0 */
+            if (!next_index) {
                 printf("\nERROR:flow file corrupted,reload vRouter module to recover\n");
                 return;
             }
@@ -1586,8 +1557,7 @@ flow_stats(void)
         flow_action_nat = 0;
         usleep(500000);
         for (i = 0; i < ft->ft_num_entries; i++) {
-            fe = (struct vr_flow_entry *)((char *)ft->ft_entries +
-                                          (i * sizeof(*fe)));
+            fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
             if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
                 if (fe->fe_flags & VR_FLOW_FLAG_EVICTED) {
                     continue;
@@ -1610,7 +1580,7 @@ flow_stats(void)
         /* calc time difference and rate */
         diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
         diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-        assert(diff_ms > 0 );
+        assert(diff_ms > 0);
         rate = (active_entries - prev_active_entries) * 1000;
         rate /= diff_ms;
         total_rate = (total_entries - prev_total_entries) * 1000;
@@ -1623,15 +1593,13 @@ flow_stats(void)
 
         if (rate != 0 || total_rate != 0) {
             if (rate < -1000) {
-                avg_teardown_rate = avg_teardown_rate * teardown_time -
-                    (active_entries - prev_active_entries) * 1000;
+                avg_teardown_rate = avg_teardown_rate * teardown_time - (active_entries - prev_active_entries) * 1000;
                 teardown_time += diff_ms;
                 avg_teardown_rate /= teardown_time;
             }
 
             if (rate > 1000) {
-                avg_setup_rate = avg_setup_rate * setup_time +
-                    (active_entries - prev_active_entries) * 1000;
+                avg_setup_rate = avg_setup_rate * setup_time + (active_entries - prev_active_entries) * 1000;
                 setup_time += diff_ms;
                 avg_setup_rate /= setup_time;
             }
@@ -1647,8 +1615,7 @@ flow_stats(void)
         time_t secs = now.tv_sec;
         struct tm *tm;
         char fmt[64], buf[64];
-        if((tm = localtime(&secs)) != NULL)
-        {
+        if ((tm = localtime(&secs)) != NULL) {
             strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S %z", tm);
             snprintf(buf, sizeof buf, fmt, now.tv_usec);
             printf("%s\n", buf);
@@ -1657,11 +1624,12 @@ flow_stats(void)
         printf("Flow Statistics\n");
         printf("---------------\n");
         printf("    Total  Entries  --- Total = %7d, new = %7d \n",
-                total_entries, (total_entries - prev_total_entries));
+               total_entries,
+               (total_entries - prev_total_entries));
         printf("    Active Entries  --- Total = %7d, new = %7d \n",
-                active_entries, (active_entries - prev_active_entries));
-        printf("    Hold   Entries  --- Total = %7d, new = %7d \n",
-                hold_entries, (hold_entries - prev_hold_entries));
+               active_entries,
+               (active_entries - prev_active_entries));
+        printf("    Hold   Entries  --- Total = %7d, new = %7d \n", hold_entries, (hold_entries - prev_hold_entries));
         printf("    Fwd flow Entries  - Total = %7d\n", flow_action_fwd);
         printf("    drop flow Entries - Total = %7d\n", flow_action_drop);
         printf("    NAT flow Entries  - Total = %7d\n\n", flow_action_nat);
@@ -1718,7 +1686,7 @@ flow_rate(void)
         /* calc time difference and rate */
         diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
         diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-        assert(diff_ms > 0 );
+        assert(diff_ms > 0);
 
         hold_count = ft->ft_hold_entries;
         hold_rate = hold_count * 1000 / diff_ms;
@@ -1740,14 +1708,19 @@ flow_rate(void)
         strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S", tm);
 
         if (hold_rate || processed_rate || added_rate || deleted_rate) {
-            printf ("%s.%03d:  Entries = %8d "
-                    "Rate = %6d (Fwd = %8d Rev = %8d Del = %8d) "
-                    "Hold = %8d Free Burst Tokens = %8d Total Hold Entries %8d\n",
-                    fmt, (int)now.tv_usec/1000,
-                    (int)ft->ft_total_entries, flow_op_rate, processed_count,
-                    added_count, deleted_count, hold_count,
-                    ft->ft_burst_free_tokens,
-                    ft->ft_hold_entries);
+            printf("%s.%03d:  Entries = %8d "
+                   "Rate = %6d (Fwd = %8d Rev = %8d Del = %8d) "
+                   "Hold = %8d Free Burst Tokens = %8d Total Hold Entries %8d\n",
+                   fmt,
+                   (int)now.tv_usec / 1000,
+                   (int)ft->ft_total_entries,
+                   flow_op_rate,
+                   processed_count,
+                   added_count,
+                   deleted_count,
+                   hold_count,
+                   ft->ft_burst_free_tokens,
+                   ft->ft_hold_entries);
             fflush(stdout);
         }
 
@@ -1773,7 +1746,6 @@ get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
     ft->ft_burst_free_tokens = table->ftable_burst_free_tokens;
     ft->ft_hold_entries = table->ftable_hold_entries;
 
-
     return 0;
 }
 
@@ -1794,8 +1766,11 @@ flow_table_map(vr_flow_table_data *table)
         return ft->ft_num_entries;
     }
 
-    mmap_error_msg = vr_table_map(table->ftable_dev, VR_MEM_FLOW_TABLE_OBJECT,
-        table->ftable_file_path, table->ftable_size, (void **)&ft->ft_entries);
+    mmap_error_msg = vr_table_map(table->ftable_dev,
+                                  VR_MEM_FLOW_TABLE_OBJECT,
+                                  table->ftable_file_path,
+                                  table->ftable_size,
+                                  (void **)&ft->ft_entries);
 
     if (mmap_error_msg) {
         printf("%s\n", mmap_error_msg);
@@ -1815,12 +1790,10 @@ flow_table_map(vr_flow_table_data *table)
     ft->ft_burst_free_tokens = table->ftable_burst_free_tokens;
     ft->ft_hold_entries = table->ftable_hold_entries;
 
-
     if (table->ftable_hold_stat && table->ftable_hold_stat_size) {
         ft->ft_hold_stat_count = table->ftable_hold_stat_size;
         for (i = 0; i < table->ftable_hold_stat_size; i++) {
-            if (i ==
-                    (sizeof(ft->ft_hold_stat) / sizeof(ft->ft_hold_stat[0]))) {
+            if (i == (sizeof(ft->ft_hold_stat) / sizeof(ft->ft_hold_stat[0]))) {
                 ft->ft_hold_stat_count = i;
                 break;
             }
@@ -1879,8 +1852,7 @@ flow_table_setup(void)
 }
 
 static int
-fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action,
-        bool flush)
+fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action, bool flush)
 {
     struct vr_flow_entry *fe;
 
@@ -1898,8 +1870,7 @@ fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action,
         }
 
         if (!show_evicted_set && (fe->fe_flags & VR_FLOW_FLAG_EVICTED)) {
-            printf("Flow at index %lu is EVICTED. Use --show-evicted\n",
-                    flow_index);
+            printf("Flow at index %lu is EVICTED. Use --show-evicted\n", flow_index);
             return -1;
         }
 
@@ -1919,18 +1890,16 @@ fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action,
         req->fr_flow_dip_l = fe->fe_key.flow4_dip;
     } else {
         memcpy(&req->fr_flow_sip_u, fe->fe_key.flow6_sip, sizeof(uint64_t));
-        memcpy(&req->fr_flow_sip_l, (fe->fe_key.flow6_sip + sizeof(uint64_t)),
-               sizeof(uint64_t));
+        memcpy(&req->fr_flow_sip_l, (fe->fe_key.flow6_sip + sizeof(uint64_t)), sizeof(uint64_t));
         memcpy(&req->fr_flow_dip_u, fe->fe_key.flow6_dip, sizeof(uint64_t));
-        memcpy(&req->fr_flow_dip_l, (fe->fe_key.flow6_dip + sizeof(uint64_t)),
-               sizeof(uint64_t));
+        memcpy(&req->fr_flow_dip_l, (fe->fe_key.flow6_dip + sizeof(uint64_t)), sizeof(uint64_t));
     }
 
     req->fr_flow_proto = fe->fe_key.flow_proto;
     req->fr_flow_sport = fe->fe_key.flow_sport;
     req->fr_flow_dport = fe->fe_key.flow_dport;
     req->fr_flow_nh_id = fe->fe_key.flow_nh_id;
-    req->fr_gen_id     = fe->fe_gen_id;
+    req->fr_gen_id = fe->fe_gen_id;
 
     switch (action) {
     case 'd':
@@ -2018,9 +1987,12 @@ flow_make_flow_req_perf(vr_flow_req *req)
     }
 
     error = 0;
-    ret = sandesh_encode(req, "vr_flow_req", vr_find_sandesh_info,
+    ret = sandesh_encode(req,
+                         "vr_flow_req",
+                         vr_find_sandesh_info,
                          (nl_get_buf_ptr(cl) + attr_len),
-                         (nl_get_buf_len(cl) - attr_len), &error);
+                         (nl_get_buf_len(cl) - attr_len),
+                         &error);
 
     if ((ret <= 0) || error)
         return ret;
@@ -2041,7 +2013,7 @@ flow_make_flow_req_perf(vr_flow_req *req)
 
     struct msghdr msg;
     memset(&msg, 0, sizeof(msg));
-#if defined (__linux__)
+#if defined(__linux__)
     msg.msg_name = cl->cl_sa;
     msg.msg_namelen = cl->cl_sa_len;
 #endif
@@ -2060,7 +2032,7 @@ flow_make_flow_req_perf(vr_flow_req *req)
     while (count != 0) {
         count--;
         flow_process_response();
-     }
+    }
 
     cl->cl_buf_offset = 0;
 
@@ -2139,9 +2111,7 @@ run_perf(void)
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-    printf("Created %d HOLD and %d FWD entries in %d msec\n",
-            perf, perf, diff_ms);
-
+    printf("Created %d HOLD and %d FWD entries in %d msec\n", perf, perf, diff_ms);
 }
 
 void
@@ -2192,6 +2162,9 @@ Usage(void)
     printf("           [--sock-dir <netlink socket dir>\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [--match \"match_string\"\n");
+    printf("           [--add \"src=... dst=... [proto=...] [sport=...] [dport=...] "
+           "[nh=...] [vrf=...] [action=...]\"]\n");
+    printf("           [--reverse]\n");
     printf("           [-l]\n");
     printf("           [--show-evicted]\n");
     printf("           [-r]\n");
@@ -2201,7 +2174,8 @@ Usage(void)
     printf("           [-F]\n");
     printf("\n");
 
-    printf("-f <flow_index>  Set forward action for flow at flow_index <flow_index>\n");
+    printf("-f <flow_index>  Set forward action for flow at flow_index "
+           "<flow_index>\n");
     printf("-d <flow_index>  Set drop action for flow at flow_index <flow_index>\n");
     printf("-i <flow_index>  Invalidate flow at flow_index <flow_index>\n");
     printf("-e <flow_index>  force evict flow at flow_index <flow_index>\n");
@@ -2211,18 +2185,33 @@ Usage(void)
     printf("--get            Get and print flow entry in a particular index\n");
     printf("                 e.g.: --get <flow_index>\n");
     printf("--mirror         Mirror index to mirror to\n");
-    printf("--match          Match criteria separated by a '&'; IP:PORT separated by a ','\n");
+    printf("--add            Insert a new flow entry (and optionally its reverse).\n");
+    printf("                 Parameters are key=value pairs separated by spaces, e.g.:\n");
+    printf("                 --add \"src=10.0.0.1:5000 dst=10.0.0.2:6000 proto=udp nh=110 action=fwd\"\n");
+    printf("--reverse        Together with --add, also create the reverse-direction flow\n");
+    printf("--match          Match criteria separated by a '&'; IP:PORT "
+           "separated by a ','\n");
     printf("                 e.g.: --match 1.1.1.1:20\n");
     printf("                       --match \"1.1.1.1:20,2.2.2.2:22\"\n");
     printf("                       --match \"[fe80::225:90ff:fec3:afa]:22\"\n");
-    printf("                       --match \"10.204.217.10:56910 & vrf 0 & proto tcp\"\n");
-    printf("                       --match \"10.204.217.10:56910,169.254.0.3:22 & vrf 0 & proto tcp\"\n");
+    printf("                       --match \"10.204.217.10:56910 & vrf 0 & proto "
+           "tcp\"\n");
+    printf("                       --match \"10.204.217.10:56910,169.254.0.3:22 "
+           "& vrf 0 & proto tcp\"\n");
     printf("                               proto {tcp, udp, icmp, icmp6, sctp}\n");
     printf("-l               List flows\n");
     printf("--show-evicted   Show evicted flows too\n");
     printf("-r               Start dumping flow setup rate\n");
     printf("-s               Start dumping flow stats\n");
     printf("--help           Print this help\n");
+    printf("Key words accepted by --add:\n");
+    printf("    src      = <IP[:port]>\n");
+    printf("    dst      = <IP[:port]>\n");
+    printf("    proto    = tcp|udp|icmp|icmp6|sctp   (default: tcp)\n");
+    printf("    sport    = <src‑port>,  dport = <dst‑port>\n");
+    printf("    nh       = <nexthop‑id>  (default: 0)\n");
+    printf("    vrf      = <vrf‑id>      (default: 0)\n");
+    printf("    action   = fwd|drop|hold (default: fwd)\n");
 
     exit(-EINVAL);
 }
@@ -2236,26 +2225,222 @@ enum opt_flow_index {
     HELP_OPT_INDEX,
     FORCE_EVICT_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
+    ADD_OPT_INDEX,
+    REVERSE_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
-    [DVRF_OPT_INDEX]            = {"dvrf",          required_argument, &dvrf_set,           1},
-    [GET_OPT_INDEX]             = {"get",           required_argument, &get_set,            1},
-    [MIRROR_OPT_INDEX]          = {"mirror",        required_argument, &mir_set,            1},
-    [SHOW_EVICTED_OPT_INDEX]    = {"show-evicted",  no_argument,       &show_evicted_set,   1},
-    [MATCH_OPT_INDEX]           = {"match",         required_argument, &match_set,          1},
-    [HELP_OPT_INDEX]            = {"help",          no_argument,       &help_set,           1},
-    [FORCE_EVICT_OPT_INDEX]     = {"force-evict",   required_argument, &force_evict_set,    1},
-    [SOCK_DIR_OPT_INDEX]        = {"sock-dir",      required_argument, &sock_dir_set,       1},
-    [MAX_OPT_INDEX]             = { NULL,           0,                 0,                   0}
+    [DVRF_OPT_INDEX] = {"dvrf", required_argument, &dvrf_set, 1},
+    [GET_OPT_INDEX] = {"get", required_argument, &get_set, 1},
+    [MIRROR_OPT_INDEX] = {"mirror", required_argument, &mir_set, 1},
+    [SHOW_EVICTED_OPT_INDEX] = {"show-evicted", no_argument, &show_evicted_set, 1},
+    [MATCH_OPT_INDEX] = {"match", required_argument, &match_set, 1},
+    [HELP_OPT_INDEX] = {"help", no_argument, &help_set, 1},
+    [FORCE_EVICT_OPT_INDEX] = {"force-evict", required_argument, &force_evict_set, 1},
+    [SOCK_DIR_OPT_INDEX] = {"sock-dir", required_argument, &sock_dir_set, 1},
+    [ADD_OPT_INDEX] = {"add", required_argument, 0, 'A'},
+    [REVERSE_OPT_INDEX] = {"reverse", no_argument, 0, 'R'},
+    [MAX_OPT_INDEX] = {NULL, 0, 0, 0}};
+
+struct add_flow_opts {
+    __u8 family;
+    __u8 proto;
+    __u16 sport;
+    __u16 dport;
+    __u32 sip_v4;
+    __u32 dip_v4;
+    __u8 sip_v6[16];
+    __u8 dip_v6[16];
+    int nh_id;
+    int vrf;
+    char action;
+    bool reverse;
+    bool set;
+} add_opts = {
+    .family = AF_UNSPEC,
+    .proto = VR_IP_PROTO_TCP,
+    .sport = 0,
+    .dport = 0,
+    .nh_id = 0,
+    .vrf = 0,
+    .action = 'f',
 };
+
+static int
+parse_u16(const char *s, __u16 *out)
+{
+    unsigned long v;
+    char *end = NULL;
+    errno = 0;
+
+    v = strtoll(s, &end, 0);
+    if (errno || *end || v > 0xffff) {
+        printf("invalid __u16 value\n");
+        return -EINVAL;
+    }
+    *out = (__u16)v;
+
+    return 0;
+}
+
+static int
+parse_ip_port(const char *s, __u8 *family, __u8 *ip_out, __u32 *ip4_out, __u16 *port_out)
+{
+    char buf[256];
+    strncpy(buf, s, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    char *p_colon = strrchr(buf, ':');
+    char *ip_str = buf;
+    char *port_str = NULL;
+
+    if (p_colon) {
+        *p_colon = '\0';
+        port_str = p_colon + 1;
+        if (parse_u16(port_str, port_out)) {
+            printf("invalid ip6 string format\n");
+            return -EINVAL;
+        }
+    }
+
+    if (buf[0] == '[') {
+        size_t len = strlen(buf);
+        if (buf[len - 1] != ']') {
+            printf("invalid ip6 string format\n");
+            return -EINVAL;
+        }
+        buf[len - 1] = '\0';
+        ip_str = buf + 1;
+    }
+
+    __u8 tmp6[16];
+    if (inet_pton(AF_INET, ip_str, ip4_out) == 1) {
+        *family = AF_INET;
+    } else if (inet_pton(AF_INET6, ip_str, tmp6) == 1) {
+        *family = AF_INET6;
+        memcmp(ip_out, tmp6, sizeof(tmp6));
+    } else {
+        printf("unknown inet\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int
+parse_add_option(char *arg)
+{
+    char *saveptr = NULL;
+    char *token = strtok_r(arg, " ", &saveptr);
+
+    while (token) {
+        char *eq = strchr(token, '=');
+        if (!eq)
+            return -EINVAL;
+
+        *eq = '\0';
+        char *k = token;
+        char *v = eq + 1;
+
+        if (!strcmp(k, "src")) {
+            if (parse_ip_port(v, &add_opts.family, add_opts.sip_v6, &add_opts.sip_v4, &add_opts.sport))
+                return -EINVAL;
+        } else if (!strcmp(k, "dst")) {
+            if (parse_ip_port(v, &add_opts.family, add_opts.dip_v6, &add_opts.dip_v4, &add_opts.dport))
+                return -EINVAL;
+        } else if (!strcmp(k, "proto")) {
+            if (!strcasecmp(v, "tcp"))
+                add_opts.proto = VR_IP_PROTO_TCP;
+            else if (!strcasecmp(v, "udp"))
+                add_opts.proto = VR_IP_PROTO_UDP;
+            else if (!strcasecmp(v, "icmp"))
+                add_opts.proto = VR_IP_PROTO_ICMP;
+            else if (!strcasecmp(v, "icmp6"))
+                add_opts.proto = VR_IP_PROTO_ICMP6;
+            else if (!strcasecmp(v, "sctp"))
+                add_opts.proto = VR_IP_PROTO_SCTP;
+            else
+                return -EINVAL;
+        } else if (!strcmp(k, "sport")) {
+            if (parse_u16(v, &add_opts.sport))
+                return -EINVAL;
+        } else if (!strcmp(k, "dport")) {
+            if (parse_u16(v, &add_opts.dport))
+                return -EINVAL;
+        } else if (!strcmp(k, "nh")) {
+            add_opts.nh_id = atoi(v);
+        } else if (!strcmp(k, "vrf")) {
+            add_opts.vrf = atoi(v);
+        } else if (!strcmp(k, "action")) {
+            if (!strcasecmp(v, "fwd") || !strcasecmp(v, "forward"))
+                add_opts.action = 'f';
+            else if (!strcmp(v, "drop"))
+                add_opts.action = 'd';
+            else if (!strcasecmp(v, "hold"))
+                add_opts.action = 'h';
+            else
+                return -EINVAL;
+        } else {
+            printf("unknown add option: %s\n", k);
+            return -EINVAL;
+        }
+
+        token = strtok_r(NULL, " ", &saveptr);
+    }
+
+    add_opts.set = true;
+    return 0;
+}
+
+static int
+send_flow_add(bool reverse)
+{
+    vr_flow_req req;
+    memset(&req, 0, sizeof(req));
+    req.fr_op = FLOW_OP_FLOW_SET;
+    req.fr_rid = 0;
+    req.fr_flags = VR_FLOW_FLAG_ACTIVE;
+    req.fr_family = add_opts.family;
+    req.fr_flow_proto = add_opts.proto;
+    req.fr_flow_sport = htons(reverse ? add_opts.dport : add_opts.sport);
+    req.fr_flow_dport = htons(reverse ? add_opts.sport : add_opts.dport);
+    req.fr_flow_nh_id = add_opts.nh_id;
+    req.fr_index = -1;
+
+    switch (add_opts.action) {
+    case 'd':
+        req.fr_action = VR_FLOW_ACTION_DROP;
+        break;
+    case 'h':
+        req.fr_action = VR_FLOW_ACTION_HOLD;
+        break;
+    default:
+        req.fr_action = VR_FLOW_ACTION_FORWARD;
+        break;
+    }
+
+    if (add_opts.family == AF_INET) {
+        req.fr_flow_sip_l = reverse ? add_opts.dip_v4 : add_opts.sip_v4;
+        req.fr_flow_dip_l = reverse ? add_opts.sip_v4 : add_opts.dip_v4;
+    } else {
+        uint8_t *sip = reverse ? add_opts.dip_v6 : add_opts.sip_v6;
+        uint8_t *dip = reverse ? add_opts.sip_v6 : add_opts.dip_v6;
+        memcpy(&req.fr_flow_sip_u, sip, 16);
+        memcpy(&req.fr_flow_dip_u, dip, 16);
+    }
+
+    if (vr_sendmsg(cl, &req, "vr_flow_req") <= 0)
+        return -1;
+
+    vr_recvmsg(cl, false);
+    return 0;
+}
 
 static void
 validate_options(void)
 {
-    if (!flow_index && !list && !rate && !stats && !match_set
-        && !perf && !flush)
+    if (!add_opts.set && !flow_index && !list && !rate && !stats && !match_set && !perf && !flush)
         Usage();
 
     if (show_evicted_set && !list)
@@ -2272,7 +2457,9 @@ flow_set_family(unsigned int family, char *addr, const char *port)
 
     if (match_ip1_set && match_ip2_set && (addr || port)) {
         printf("match: Why do you specify \"[%s]:%s\" when both ends of "
-                "the flow are already specified\n", addr, port ? port : NULL);
+               "the flow are already specified\n",
+               addr,
+               port ? port : NULL);
         return -EINVAL;
     }
 
@@ -2362,13 +2549,11 @@ flow_set_tuple(char *ip_port)
             return -EINVAL;
         }
 
-
         address_len = bracket_sep - ip_port + 1;
         /* post ']', we should have a ':' and a port number */
-        if (((len - address_len) < 2) ||
-                (ip_port[address_len] != ':')) {
+        if (((len - address_len) < 2) || (ip_port[address_len] != ':')) {
             printf("match: match string should be in "
-                    "[aa:aa::aa:aa]:p format\n");
+                   "[aa:aa::aa:aa]:p format\n");
             return -EINVAL;
         }
 
@@ -2395,8 +2580,7 @@ flow_set_tuple(char *ip_port)
                  * ':' is a port separator
                  */
                 ip_port[f_colon_sep - ip_port] = '\0';
-                if (flow_set_family(AF_INET, ip_port,
-                        ip_port + (f_colon_sep - ip_port) + 1))
+                if (flow_set_family(AF_INET, ip_port, ip_port + (f_colon_sep - ip_port) + 1))
                     return -EINVAL;
             }
         } else {
@@ -2434,7 +2618,7 @@ flow_set_ip(char *match_string)
         }
 
         if (token)
-          match_string = token + token_length;
+            match_string = token + token_length;
 
     } while (!ret && token && ((match_string - string) < length));
 
@@ -2466,7 +2650,7 @@ flow_set_proto(char *string)
     } else if (!strncmp(string, "udp", strlen("udp"))) {
         match_proto = VR_IP_PROTO_UDP;
     } else if (!strncmp(string, "icmp6", strlen("icmp6"))) {
-        match_proto =  VR_IP_PROTO_ICMP6;
+        match_proto = VR_IP_PROTO_ICMP6;
     } else if (!strncmp(string, "icmp", strlen("icmp"))) {
         match_proto = VR_IP_PROTO_ICMP;
     } else if (!strncmp(string, "sctp", strlen("sctp"))) {
@@ -2551,7 +2735,14 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         vr_socket_dir = opt_arg;
         break;
 
+    case ADD_OPT_INDEX:
+        add_opts.reverse = false;
+        break;
+    case REVERSE_OPT_INDEX:
+        add_opts.reverse = true;
+        break;
     case HELP_OPT_INDEX:
+        break;
     default:
         Usage();
     }
@@ -2568,8 +2759,7 @@ main(int argc, char *argv[])
 
     flow_fill_nl_callbacks();
 
-    while ((opt = getopt_long(argc, argv, "d:f:g:i:e:p:u:b:lrsF",
-                    long_options, &option_index)) >= 0) {
+    while ((opt = getopt_long(argc, argv, "d:f:g:i:e:p:u:b:lrsFA:R", long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
         case 'g':
@@ -2599,26 +2789,41 @@ main(int argc, char *argv[])
         case 'p':
             perf = strtoul(optarg, NULL, 0);
             if (perf > MAX_FLOWS) {
-                printf("Invalid perf count %d. Max value %d\n", perf,
-                       MAX_FLOWS);
+                printf("Invalid perf count %d. Max value %d\n", perf, MAX_FLOWS);
                 exit(-1);
             }
             break;
 
-        case 'b' :
+        case 'b':
             bunch = strtoul(optarg, NULL, 0);
             if (bunch < 1) {
                 bunch = 1;
             }
             if (bunch > MAX_FLOW_NL_MSG_BUNCH) {
-                printf("Max NETLINK messages in a bunch cannot exceed %u.\n",
-                        MAX_FLOW_NL_MSG_BUNCH);
+                printf("Max NETLINK messages in a bunch cannot exceed %u.\n", MAX_FLOW_NL_MSG_BUNCH);
                 bunch = MAX_FLOW_NL_MSG_BUNCH;
             }
             break;
         case 'u':
             sock_dir_set = 1;
             parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+            break;
+
+        case 'A':
+            parse_long_opts(ADD_OPT_INDEX, optarg);
+            if (parse_add_option(optarg)) {
+                printf("Invalid --add parameters\n");
+                exit(-EINVAL);
+            }
+            break;
+
+        case 'R':
+            parse_long_opts(REVERSE_OPT_INDEX, optarg);
+            add_opts.reverse = true;
+            if (parse_add_option(optarg)) {
+                printf("Invalid --add parameters\n");
+                exit(-EINVAL);
+            }
             break;
 
         case 0:
@@ -2640,7 +2845,18 @@ main(int argc, char *argv[])
     if (ret < 0)
         return ret;
 
-    if (list) {
+    if (add_opts.set) {
+        if (add_opts.family == AF_UNSPEC) {
+            printf("--add: invalid src/dst");
+            return -1;
+        }
+
+        if (send_flow_add(false))
+            return -1;
+        if (add_opts.reverse)
+            send_flow_add(true);
+        printf("Flow(s) added successfully\n");
+    } else if (list) {
         flow_list();
     } else if (rate) {
         flow_rate();
@@ -2653,7 +2869,8 @@ main(int argc, char *argv[])
     } else {
         if (flow_index >= main_table.ft_num_entries) {
             printf("Flow index %lu is greater than available indices (%u)\n",
-                    flow_index, main_table.ft_num_entries - 1);
+                   flow_index,
+                   main_table.ft_num_entries - 1);
             return -1;
         }
 

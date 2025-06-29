@@ -61,6 +61,7 @@ struct forwarding_ctx {
   struct vr_afxdp_xsk_socket_info *xsks[MAX_Q_PER_FWD_CAP];
   struct vr_afxdp_tx_cache txc[MAX_Q_PER_FWD_CAP];
   struct afxdp_rx_arg *pending;
+  __s32 affinity;
   __s32 eventfd;
   __u32 n_active;
   volatile bool stop;

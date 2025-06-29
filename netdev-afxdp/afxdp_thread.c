@@ -163,6 +163,7 @@ uring_handler_func(void *arg)
           free(tmp);
         }
 
+        io_uring_submit(&ctx->ring);
       } else {
         __u32 vif_id = cqe->user_data >> 8;
         __u16 qid = cqe->user_data & 0xFF;
@@ -180,8 +181,6 @@ uring_handler_func(void *arg)
 
       io_uring_cqe_seen(&ctx->ring, cqe);
     }
-
-    io_uring_submit(&ctx->ring);
   }
 
   io_uring_queue_exit(&ctx->ring);

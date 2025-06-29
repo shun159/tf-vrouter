@@ -3,9 +3,9 @@ BreakBeforeBraces: Custom
 BraceWrapping: {
   AfterFunction: 'true'
 }
-ColumnLimit: 80
+ColumnLimit: 120
 IndentCaseLabels: false
-IndentWidth: 2
+IndentWidth: 4
 MaxEmptyLinesToKeep: 1
 PointerAlignment: Right
 IncludeCategories:
