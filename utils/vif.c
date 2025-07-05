@@ -1270,7 +1270,7 @@ static struct option long_options[] = {
     [CLEAR_STATS_OPT_INDEX] = {"clear", no_argument, &clear_stats_set, 1},
     [MAC_LEARN_OPT_INDEX] = {"mac-learn", no_argument, &mac_learn_set, 1},
     [UNKNOWN_UC_FLOOD_OPT_INDEX] = {"unknown-uc-flood", no_argument, &uuc_flood_set, 1},
-    [NH_OPT_INDEX] = {"nexthop", no_argument, &nh_set, 1},
+    [NH_OPT_INDEX] = {"nexthop", required_argument, &nh_set, 1},
     [MAX_OPT_INDEX] = {NULL, 0, NULL, 0},
 };
 
