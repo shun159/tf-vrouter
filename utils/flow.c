@@ -2252,7 +2252,11 @@ struct add_flow_opts {
     __u32 dip_v4;
     __u8 sip_v6[16];
     __u8 dip_v6[16];
+    __u32 index;
+    __u32 r_index;
+    __u16 tcp_flags;
     int nh_id;
+    int r_nh_id;
     int vrf;
     char action;
     bool reverse;
@@ -2263,6 +2267,7 @@ struct add_flow_opts {
     .sport = 0,
     .dport = 0,
     .nh_id = 0,
+    .r_nh_id = -1,
     .vrf = 0,
     .action = 'f',
 };
@@ -2319,7 +2324,7 @@ parse_ip_port(const char *s, __u8 *family, __u8 *ip_out, __u32 *ip4_out, __u16 *
         *family = AF_INET;
     } else if (inet_pton(AF_INET6, ip_str, tmp6) == 1) {
         *family = AF_INET6;
-        memcmp(ip_out, tmp6, sizeof(tmp6));
+        memcpy(ip_out, tmp6, sizeof(tmp6));
     } else {
         printf("unknown inet\n");
         return -EINVAL;
@@ -2350,9 +2355,13 @@ parse_add_option(char *arg)
             if (parse_ip_port(v, &add_opts.family, add_opts.dip_v6, &add_opts.dip_v4, &add_opts.dport))
                 return -EINVAL;
         } else if (!strcmp(k, "proto")) {
-            if (!strcasecmp(v, "tcp"))
+            if (!strcasecmp(v, "tcp")) {
                 add_opts.proto = VR_IP_PROTO_TCP;
-            else if (!strcasecmp(v, "udp"))
+                add_opts.tcp_flags |= VR_FLOW_TCP_SYN;
+                add_opts.tcp_flags |= VR_FLOW_TCP_SYN_R;
+                add_opts.tcp_flags |= VR_FLOW_TCP_SYN;
+                add_opts.tcp_flags |= VR_FLOW_TCP_SYN_R;
+            } else if (!strcasecmp(v, "udp"))
                 add_opts.proto = VR_IP_PROTO_UDP;
             else if (!strcasecmp(v, "icmp"))
                 add_opts.proto = VR_IP_PROTO_ICMP;
@@ -2370,6 +2379,12 @@ parse_add_option(char *arg)
                 return -EINVAL;
         } else if (!strcmp(k, "nh")) {
             add_opts.nh_id = atoi(v);
+        } else if (!strcmp(k, "reverse_nh")) {
+            add_opts.r_nh_id = atoi(v);
+        } else if (!strcmp(k, "index")) {
+            add_opts.index = atoi(v);
+        } else if (!strcmp(k, "reverse_index")) {
+            add_opts.r_index = atoi(v);
         } else if (!strcmp(k, "vrf")) {
             add_opts.vrf = atoi(v);
         } else if (!strcmp(k, "action")) {
@@ -2394,46 +2409,107 @@ parse_add_option(char *arg)
 }
 
 static int
-send_flow_add(bool reverse)
+send_and_get_index(vr_flow_req *req, unsigned int *index_out, unsigned int *genid_out)
 {
-    vr_flow_req req;
-    memset(&req, 0, sizeof(req));
-    req.fr_op = FLOW_OP_FLOW_SET;
-    req.fr_rid = 0;
-    req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    req.fr_family = add_opts.family;
-    req.fr_flow_proto = add_opts.proto;
-    req.fr_flow_sport = htons(reverse ? add_opts.dport : add_opts.sport);
-    req.fr_flow_dport = htons(reverse ? add_opts.sport : add_opts.dport);
-    req.fr_flow_nh_id = add_opts.nh_id;
-    req.fr_index = -1;
+    int ret;
 
-    switch (add_opts.action) {
-    case 'd':
-        req.fr_action = VR_FLOW_ACTION_DROP;
-        break;
-    case 'h':
-        req.fr_action = VR_FLOW_ACTION_HOLD;
-        break;
-    default:
-        req.fr_action = VR_FLOW_ACTION_FORWARD;
-        break;
-    }
+    ret = flow_make_flow_req(req, "vr_flow_req");
 
+    vr_flow_response *resp = (vr_flow_response *)cl->cl_resp_buf;
+    if (!resp)
+        return -EIO;
+
+    *index_out = resp->fresp_index;
+    *genid_out = resp->fresp_gen_id;
+
+    return 0;
+}
+
+static int
+send_flow_add(bool need_reverse)
+{
+    array_index = 0;
+    vr_flow_req fwd;
+    memset(&fwd, 0, sizeof(fwd));
+
+    fwd.fr_op = FLOW_OP_FLOW_SET;
+    fwd.fr_flags = VR_FLOW_FLAG_ACTIVE;
+    fwd.fr_family = add_opts.family;
+    fwd.fr_flow_vrf = add_opts.vrf;
+    fwd.fr_flow_proto = add_opts.proto;
+    fwd.fr_flow_sport = htons(add_opts.sport);
+    fwd.fr_flow_dport = htons(add_opts.dport);
+    fwd.fr_flow_nh_id = add_opts.nh_id;
+    fwd.fr_src_nh_index = add_opts.nh_id;
+    fwd.fr_action = (add_opts.action == 'd')   ? VR_FLOW_ACTION_DROP
+                    : (add_opts.action == 'h') ? VR_FLOW_ACTION_HOLD
+                                               : VR_FLOW_ACTION_FORWARD;
+    fwd.fr_index = -1;
     if (add_opts.family == AF_INET) {
-        req.fr_flow_sip_l = reverse ? add_opts.dip_v4 : add_opts.sip_v4;
-        req.fr_flow_dip_l = reverse ? add_opts.sip_v4 : add_opts.dip_v4;
+        fwd.fr_flow_sip_l = add_opts.sip_v4;
+        fwd.fr_flow_dip_l = add_opts.dip_v4;
     } else {
-        uint8_t *sip = reverse ? add_opts.dip_v6 : add_opts.sip_v6;
-        uint8_t *dip = reverse ? add_opts.sip_v6 : add_opts.dip_v6;
-        memcpy(&req.fr_flow_sip_u, sip, 16);
-        memcpy(&req.fr_flow_dip_u, dip, 16);
+        memcpy(&fwd.fr_flow_sip_u, add_opts.sip_v6, 16);
+        memcpy(&fwd.fr_flow_dip_u, add_opts.dip_v6, 16);
     }
 
-    if (vr_sendmsg(cl, &req, "vr_flow_req") <= 0)
+    unsigned int fwd_idx, fwd_gen;
+    int ret = send_and_get_index(&fwd, &fwd_idx, &fwd_gen);
+    if (ret < 0)
         return -1;
 
-    vr_recvmsg(cl, false);
+    if (!need_reverse)
+        return 0;
+
+    fwd_idx = flow_md_mem[array_index].fmd_index;
+    fwd_gen = flow_md_mem[array_index].fmd_gen_id;
+    array_index++;
+    vr_flow_req rev;
+    memset(&rev, 0, sizeof(rev));
+
+    rev.fr_op = FLOW_OP_FLOW_SET;
+    rev.fr_flags = VR_FLOW_FLAG_ACTIVE | VR_RFLOW_VALID;
+    rev.fr_family = add_opts.family;
+    rev.fr_flow_vrf = add_opts.vrf;
+    rev.fr_flow_proto = add_opts.proto;
+    rev.fr_flow_sport = htons(add_opts.dport);
+    rev.fr_flow_dport = htons(add_opts.sport);
+    rev.fr_flow_nh_id = add_opts.r_nh_id;
+    rev.fr_src_nh_index = add_opts.r_nh_id;
+    rev.fr_rflow_nh_id = add_opts.nh_id;
+    rev.fr_action = fwd.fr_action;
+    rev.fr_index = -1;
+    rev.fr_rindex = fwd_idx;
+
+    if (add_opts.family == AF_INET) {
+        rev.fr_flow_sip_l = add_opts.dip_v4;
+        rev.fr_flow_dip_l = add_opts.sip_v4;
+        rev.fr_rflow_sip_l = rev.fr_flow_dip_l;
+        rev.fr_rflow_dip_l = rev.fr_flow_sip_l;
+
+    } else {
+        memcpy(&rev.fr_flow_sip_u, add_opts.sip_v6, 16);
+        memcpy(&rev.fr_flow_dip_u, add_opts.dip_v6, 16);
+        memcpy(&rev.fr_rflow_sip_u, add_opts.dip_v6, 16);
+        memcpy(&rev.fr_rflow_dip_u, add_opts.sip_v6, 16);
+    }
+
+    array_index++;
+
+    unsigned int rev_idx, rev_gen;
+    if (send_and_get_index(&rev, &rev_idx, &rev_gen))
+        return -1;
+
+    rev_idx = flow_md_mem[array_index].fmd_index;
+    rev_gen = flow_md_mem[array_index].fmd_gen_id;
+
+    fwd.fr_op = FLOW_OP_FLOW_SET;
+    fwd.fr_flags |= VR_FLOW_FLAG_ACTIVE | VR_RFLOW_VALID;
+    fwd.fr_index = fwd_idx;
+    fwd.fr_gen_id = fwd_gen;
+    fwd.fr_rindex = rev_idx;
+    flow_make_flow_req(&fwd, "vr_flow_req");
+
     return 0;
 }
 
@@ -2820,10 +2896,6 @@ main(int argc, char *argv[])
         case 'R':
             parse_long_opts(REVERSE_OPT_INDEX, optarg);
             add_opts.reverse = true;
-            if (parse_add_option(optarg)) {
-                printf("Invalid --add parameters\n");
-                exit(-EINVAL);
-            }
             break;
 
         case 0:
@@ -2850,11 +2922,7 @@ main(int argc, char *argv[])
             printf("--add: invalid src/dst");
             return -1;
         }
-
-        if (send_flow_add(false))
-            return -1;
-        if (add_opts.reverse)
-            send_flow_add(true);
+        send_flow_add(add_opts.reverse);
         printf("Flow(s) added successfully\n");
     } else if (list) {
         flow_list();

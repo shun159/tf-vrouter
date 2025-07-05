@@ -58,7 +58,8 @@ vr_extract_token(char *string, char token_separator)
     char *sep;
 
     /* skip over leading white spaces */
-    while ((*string == ' ') && string++);
+    while ((*string == ' ') && string++)
+        ;
 
     /* if there is nothing left after the spaces, return */
     if (!(length = strlen(string))) {
@@ -82,7 +83,8 @@ vr_extract_token(char *string, char token_separator)
 
     /* remove trailing spaces */
     length -= 1;
-    while ((*(string + length) == ' ') && --length);
+    while ((*(string + length) == ' ') && --length)
+        ;
     *(string + length + 1) = '\0';
 
     /*
@@ -166,7 +168,7 @@ vr_valid_ipv4_address(const char *addr)
 bool
 vr_valid_mac_address(const char *mac)
 {
-    uint8_t null_mac[VR_ETHER_ALEN] = { 0 };
+    uint8_t null_mac[VR_ETHER_ALEN] = {0};
 
     if (!mac || !memcmp(mac, null_mac, VR_ETHER_ALEN))
         return false;
@@ -197,7 +199,6 @@ vr_proto_string(unsigned short proto)
     case VR_IP_PROTO_ICMP6:
         return "ICMPv6";
         break;
-
 
     default:
         return "UNKNOWN";
@@ -230,8 +231,7 @@ vr_recvmsg_generic(struct nl_client *cl, bool dump, bool msg_wait)
 
             resp = nl_parse_reply(cl);
             if (resp->nl_op == SANDESH_REQUEST) {
-                sandesh_decode(resp->nl_data, resp->nl_len,
-                        vr_find_sandesh_info, &ret);
+                sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
             } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
                 pending = false;
             }
@@ -260,8 +260,7 @@ vr_recvmsg_waitall(struct nl_client *cl, bool dump)
 }
 
 int
-vr_sendmsg(struct nl_client *cl, void *request,
-        char *request_string)
+vr_sendmsg(struct nl_client *cl, void *request, char *request_string)
 {
     int ret, error, attr_len;
 
@@ -276,9 +275,12 @@ vr_sendmsg(struct nl_client *cl, void *request,
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(request, request_string, vr_find_sandesh_info,
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
+    ret = sandesh_encode(request,
+                         request_string,
+                         vr_find_sandesh_info,
+                         (nl_get_buf_ptr(cl) + attr_len),
+                         (nl_get_buf_len(cl) - attr_len),
+                         &error);
     if (ret <= 0)
         return ret;
 
@@ -313,9 +315,8 @@ vr_get_nl_client(int proto)
     if (ret < 0)
         goto fail;
 
-    if ((proto == VR_NETLINK_PROTO_DEFAULT) &&
-          (get_platform() != VTEST_PLATFORM) &&
-            (vrouter_obtain_family_id(cl) <= 0))
+    if ((proto == VR_NETLINK_PROTO_DEFAULT) && (get_platform() != VTEST_PLATFORM) &&
+        (vrouter_obtain_family_id(cl) <= 0))
         goto fail;
 
     return cl;
@@ -354,8 +355,7 @@ vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
         return ret;
 
     if (ret != state) {
-        printf("vRouter: Set DCB State failed (Req/Resp: %u/%d)\n",
-                state, ret);
+        printf("vRouter: Set DCB State failed (Req/Resp: %u/%d)\n", state, ret);
         return -1;
     }
 
@@ -388,8 +388,7 @@ vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
         return ret;
 
     if (ret) {
-        printf("vRouter: Set DCBX failed (Req/Resp: %u/%d)\n",
-            dcbx, ret);
+        printf("vRouter: Set DCBX failed (Req/Resp: %u/%d)\n", dcbx, ret);
         return -1;
     }
 
@@ -409,8 +408,7 @@ vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
 }
 
 int
-vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
-        struct priority *p)
+vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname, struct priority *p)
 {
     int ret;
 
@@ -426,8 +424,7 @@ vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
 }
 
 int
-vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
-        struct priority *p)
+vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname, struct priority *p)
 {
     int ret;
 
@@ -455,8 +452,7 @@ vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
 }
 
 int
-vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
-        struct priority *p)
+vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname, struct priority *p)
 {
     int ret;
 
@@ -468,8 +464,7 @@ vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
 }
 
 int
-vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
-        struct priority *p)
+vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname, struct priority *p)
 {
     int ret;
 
@@ -489,7 +484,7 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
         printf("Statistics for core %u\n\n", core);
 
     if (stats->vds_pcpu_stats_failure_status)
-       printf("Failed to maintain PerCPU stats for this interface\n\n");
+        printf("Failed to maintain PerCPU stats for this interface\n\n");
 
     PRINT_DROP_STAT("Invalid IF", stats->vds_invalid_if);
     PRINT_DROP_STAT("Invalid ARP", stats->vds_invalid_arp);
@@ -498,7 +493,7 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
     PRINT_DROP_STAT("IF Drop", stats->vds_interface_drop);
     PRINT_DROP_STAT("IF RX Discard", stats->vds_interface_rx_discard);
     PRINT_DROP_STAT("Flow Unusable", stats->vds_flow_unusable);
-    PRINT_DROP_STAT("Flow No Memory",stats->vds_flow_no_memory);
+    PRINT_DROP_STAT("Flow No Memory", stats->vds_flow_no_memory);
     PRINT_DROP_STAT("Flow Table Full", stats->vds_flow_table_full);
     PRINT_DROP_STAT("Flow NAT no rflow", stats->vds_flow_nat_no_rflow);
     PRINT_DROP_STAT("Flow Action Drop", stats->vds_flow_action_drop);
@@ -543,8 +538,7 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
     PRINT_DROP_STAT("Clone Failures", stats->vds_clone_fail);
     PRINT_DROP_STAT("Invalid underlay ECMP", stats->vds_invalid_underlay_ecmp);
 
-    if (platform == DPDK_PLATFORM)
-    {
+    if (platform == DPDK_PLATFORM) {
         PRINT_DROP_STAT("VLAN fwd intf failed TX", stats->vds_vlan_fwd_tx);
         PRINT_DROP_STAT("VLAN fwd intf failed enq", stats->vds_vlan_fwd_enq);
     }
@@ -554,30 +548,37 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
 void
 vr_print_drop_dbg_stats(vr_drop_stats_req *stats, int core)
 {
-    printf("Cloned Original               %" PRIu64 "\n",
-            stats->vds_cloned_original);
+    printf("Cloned Original               %" PRIu64 "\n", stats->vds_cloned_original);
     return;
 }
 
 const char *
 vr_pkt_vp_type_rsn(unsigned char vp_type)
 {
-    switch(vp_type) {
-    case VP_TYPE_ARP:    return "ARP";
-    case VP_TYPE_IP :    return "IP";
-    case VP_TYPE_IP6:    return "IP6";
-    case VP_TYPE_IPOIP:  return "IPOIP";
-    case VP_TYPE_IP6OIP: return "IP6OIP";
-    case VP_TYPE_AGENT:  return "AGENT";
-    case VP_TYPE_PBB:    return "PBB";
-    default:             return "UNKNOWN";
+    switch (vp_type) {
+    case VP_TYPE_ARP:
+        return "ARP";
+    case VP_TYPE_IP:
+        return "IP";
+    case VP_TYPE_IP6:
+        return "IP6";
+    case VP_TYPE_IPOIP:
+        return "IPOIP";
+    case VP_TYPE_IP6OIP:
+        return "IP6OIP";
+    case VP_TYPE_AGENT:
+        return "AGENT";
+    case VP_TYPE_PBB:
+        return "PBB";
+    default:
+        return "UNKNOWN";
     }
 }
 
 const char *
 vr_pkt_droplog_rsn(unsigned short drop_reason)
 {
-    switch(drop_reason) {
+    switch (drop_reason) {
     case VP_DROP_DISCARD:
         return "Discards";
     case VP_DROP_PULL:
@@ -689,53 +690,43 @@ vr_pkt_droplog_rsn(unsigned short drop_reason)
     default:
         return "Unknow";
     }
-
 }
-void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i,
-                                uint8_t show_pkt_drop_type)
+void
+vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i, uint8_t show_pkt_drop_type)
 {
     int j = 0;
-    vr_pkt_drop_log_t *pkt_log_utils =
-        (vr_pkt_drop_log_t*)pkt_log->vdl_pkt_droplog_arr;
+    vr_pkt_drop_log_t *pkt_log_utils = (vr_pkt_drop_log_t *)pkt_log->vdl_pkt_droplog_arr;
     struct tm *ptr_time;
     char ipv6_addr[INET6_ADDRSTRLEN] = "";
 
     /* String mapping for packet drop log */
-    char vr_pkt_droplog_str[][50] = {
-        FILE_MAP(string)
-    };
+    char vr_pkt_droplog_str[][50] = {FILE_MAP(string)};
 
     if (!pkt_log_utils[i].vp_type)
         return;
 
-    if ((show_pkt_drop_type != VP_DROP_MAX) &&
-        (show_pkt_drop_type != pkt_log_utils[i].drop_reason))
+    if ((show_pkt_drop_type != VP_DROP_MAX) && (show_pkt_drop_type != pkt_log_utils[i].drop_reason))
         return;
 
-    if((pkt_log->vdl_log_idx+i < VR_PKT_DROP_LOG_MAX) &&
-        (!vr_header_include))
-    {
+    if ((pkt_log->vdl_log_idx + i < VR_PKT_DROP_LOG_MAX) && (!vr_header_include)) {
         vr_print_pkt_drop_log_header(pkt_log);
         vr_header_include = 1;
     }
 
     ptr_time = localtime(&(pkt_log_utils[i].timestamp));
 
-    printf("sl no: %d  ", pkt_log->vdl_log_idx+i);
+    printf("sl no: %d  ", pkt_log->vdl_log_idx + i);
     printf("Epoch Time: %ld ", pkt_log_utils[i].timestamp);
     printf("Local Time: %s ", asctime(ptr_time));
     printf("Packet Type: %s  ", vr_pkt_vp_type_rsn(pkt_log_utils[i].vp_type));
-    if(pkt_log_utils[i].drop_reason)
+    if (pkt_log_utils[i].drop_reason)
         printf("Drop reason: %s  ", vr_pkt_droplog_rsn(pkt_log_utils[i].drop_reason));
-    PRINT_PKT_LOG("Vif idx:",    pkt_log_utils[i].vif_idx);
+    PRINT_PKT_LOG("Vif idx:", pkt_log_utils[i].vif_idx);
     PRINT_PKT_LOG("Nexthop id:", pkt_log_utils[i].nh_id);
-    if(pkt_log_utils[i].vp_type == VP_TYPE_IP)
-    {
+    if (pkt_log_utils[i].vp_type == VP_TYPE_IP) {
         printf("Src IP: %s  ", inet_ntoa(pkt_log_utils[i].src.ipv4));
         printf("Dst IP: %s  ", inet_ntoa(pkt_log_utils[i].dst.ipv4));
-    }
-    else if (pkt_log_utils[i].vp_type == VP_TYPE_IP6)
-    {
+    } else if (pkt_log_utils[i].vp_type == VP_TYPE_IP6) {
         inet_ntop(AF_INET6, &pkt_log_utils[i].src.ipv6, ipv6_addr, INET6_ADDRSTRLEN);
         printf("Src IPv6: %s  ", ipv6_addr);
         inet_ntop(AF_INET6, &pkt_log_utils[i].dst.ipv6, ipv6_addr, INET6_ADDRSTRLEN);
@@ -743,32 +734,32 @@ void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i,
     }
 
     PRINT_PKT_LOG("Source port:", pkt_log_utils[i].sport);
-    PRINT_PKT_LOG("Dest port:",   pkt_log_utils[i].dport);
-    if(pkt_log_utils[i].drop_loc.file)
+    PRINT_PKT_LOG("Dest port:", pkt_log_utils[i].dport);
+    if (pkt_log_utils[i].drop_loc.file)
         printf("file: %s  ", vr_pkt_droplog_str[pkt_log_utils[i].drop_loc.file]);
     printf("line no: %d  ", pkt_log_utils[i].drop_loc.line);
 
-    if(pkt_log_utils[i].pkt_len)
-    {
+    if (pkt_log_utils[i].pkt_len) {
         printf("Packet Length: %d  ", pkt_log_utils[i].pkt_len);
         printf("Packet Data: ");
 
-        if(pkt_log_utils[i].pkt_len > 100)
-            for(j = 0; j < 100; j++)
+        if (pkt_log_utils[i].pkt_len > 100)
+            for (j = 0; j < 100; j++)
                 printf("%02X  ", pkt_log_utils[i].pkt_header[j]);
         else
-            for(j=0;j<pkt_log_utils[i].pkt_len;j++)
+            for (j = 0; j < pkt_log_utils[i].pkt_len; j++)
                 printf("%02X  ", pkt_log_utils[i].pkt_header[j]);
     }
     printf("\n\n");
 }
-void vr_print_pkt_drop_log_header(vr_pkt_drop_log_req *pkt_log)
+void
+vr_print_pkt_drop_log_header(vr_pkt_drop_log_req *pkt_log)
 {
     printf("**********PKT DROP LOG**********\n");
     printf("Total No. of CPU's %d\n", pkt_log->vdl_max_num_cores);
     /* When requested for core 0, it will try to log for all cores
      * so here manually printing as core 1 */
-    if(pkt_log->vdl_core == 0)
+    if (pkt_log->vdl_core == 0)
         printf("Pkt Drop Log for Core 1\n\n");
     else
         printf("Pkt Drop Log for Core %d\n\n", pkt_log->vdl_core);
@@ -780,23 +771,18 @@ vr_print_pkt_drop_log(vr_pkt_drop_log_req *pkt_log, uint8_t show_pkt_drop_type)
     static bool vr_header_include = 0;
 
     /* When configured pkt buffer size is than MAX_ALLOWED_BUFFER_SIZE */
-    if(pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx  <
-            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
-    {
+    if (pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx < VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ) {
         log_buffer_iter = pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx;
-    }
-    else
+    } else
         log_buffer_iter = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
 
-    for(i = 0; i < log_buffer_iter; i++)
+    for (i = 0; i < log_buffer_iter; i++)
         vr_print_pkt_drop_log_data(pkt_log, i, show_pkt_drop_type);
 
     /* On Every VR_PKT_DROP_LOG_MAX count time need to check this
      * flag to print PKT DROP header
      */
-    if((pkt_log->vdl_log_idx + log_buffer_iter == VR_PKT_DROP_LOG_MAX) &&
-        (vr_header_include))
-    {
+    if ((pkt_log->vdl_log_idx + log_buffer_iter == VR_PKT_DROP_LOG_MAX) && (vr_header_include)) {
         vr_header_include = 0;
     }
     return;
@@ -812,13 +798,11 @@ vr_response_common_process(vr_response *resp, bool *dump_pending)
 
     if (resp->resp_code < 0) {
         if (!vr_ignore_nl_errors) {
-            printf("vRouter(Response): %s (%d)\n", strerror(-resp->resp_code),
-                    -resp->resp_code);
+            printf("vRouter(Response): %s (%d)\n", strerror(-resp->resp_code), -resp->resp_code);
         }
         ret = resp->resp_code;
     } else {
-        if ((resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) &&
-                dump_pending)
+        if ((resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) && dump_pending)
             *dump_pending = true;
     }
 
@@ -909,8 +893,7 @@ vr_drop_stats_req_get_copy(vr_drop_stats_req *src)
 }
 
 int
-vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
-        short core)
+vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id, short core)
 {
     vr_drop_stats_req req;
 
@@ -922,11 +905,14 @@ vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
     return vr_sendmsg(cl, &req, "vr_drop_stats_req");
 }
 
-
 int
-vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
-        int marker, int buff_table_id, vr_info_msg_en msginfo, int buffsz,
-        uint8_t *vr_info_inbuf)
+vr_send_info_dump(struct nl_client *cl,
+                  unsigned int router_id,
+                  int marker,
+                  int buff_table_id,
+                  vr_info_msg_en msginfo,
+                  int buffsz,
+                  uint8_t *vr_info_inbuf)
 {
     vr_info_req req;
 
@@ -937,7 +923,7 @@ vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
     req.vdu_buff_table_id = buff_table_id;
     req.vdu_msginfo = msginfo;
     req.vdu_outbufsz = buffsz;
-    if(vr_info_inbuf != NULL) {
+    if (vr_info_inbuf != NULL) {
         req.vdu_inbuf_size = strlen(vr_info_inbuf);
         req.vdu_inbuf = vr_info_inbuf;
     }
@@ -972,7 +958,7 @@ vr_drop_type_set(struct nl_client *cl, uint8_t pkt_drop_log_type)
     vr_pkt_drop_log_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op                 = SANDESH_OP_ADD;
+    req.h_op = SANDESH_OP_ADD;
     req.vdl_pkt_droplog_type = pkt_drop_log_type;
 
     /* this flag is to indentify bettwn min log config and drop type set
@@ -990,7 +976,7 @@ vr_min_log_enable(struct nl_client *cl, bool min_log)
     vr_pkt_drop_log_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op                          = SANDESH_OP_ADD;
+    req.h_op = SANDESH_OP_ADD;
     req.vdl_pkt_droplog_min_sysctl_en = min_log;
 
     /* this flag is to indentify between min log config and drop type set
@@ -1001,8 +987,8 @@ vr_min_log_enable(struct nl_client *cl, bool min_log)
     return vr_sendmsg(cl, &req, "vr_pkt_drop_log_req");
 }
 
-int vr_pkt_drop_log_request(struct nl_client *cl, unsigned int router_id,
-        unsigned int core, int log_idx )
+int
+vr_pkt_drop_log_request(struct nl_client *cl, unsigned int router_id, unsigned int core, int log_idx)
 {
     int ret = 0;
     vr_pkt_drop_log_req req;
@@ -1016,7 +1002,7 @@ int vr_pkt_drop_log_request(struct nl_client *cl, unsigned int router_id,
     req.vdl_core = core;
     req.vdl_log_idx = log_idx;
 
-    ret =  vr_sendmsg(cl, &req, "vr_pkt_drop_log_req");
+    ret = vr_sendmsg(cl, &req, "vr_pkt_drop_log_req");
 
     free(req.vdl_pkt_droplog_arr);
 
@@ -1036,13 +1022,11 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_name = NULL;
     }
 
-    if (req->vifr_queue_ierrors_to_lcore_size &&
-            req->vifr_queue_ierrors_to_lcore) {
+    if (req->vifr_queue_ierrors_to_lcore_size && req->vifr_queue_ierrors_to_lcore) {
         free(req->vifr_queue_ierrors_to_lcore);
         req->vifr_queue_ierrors_to_lcore = NULL;
         req->vifr_queue_ierrors_to_lcore_size = 0;
     }
-
 
     if (req->vifr_mac && req->vifr_mac_size) {
         free(req->vifr_mac);
@@ -1056,76 +1040,64 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_src_mac_size = 0;
     }
 
-    if (req->vifr_fat_flow_protocol_port_size &&
-            req->vifr_fat_flow_protocol_port) {
+    if (req->vifr_fat_flow_protocol_port_size && req->vifr_fat_flow_protocol_port) {
         free(req->vifr_fat_flow_protocol_port);
         req->vifr_fat_flow_protocol_port = NULL;
         req->vifr_fat_flow_protocol_port_size = 0;
     }
 
-    if (req->vifr_fat_flow_src_prefix_h &&
-        req->vifr_fat_flow_src_prefix_h_size) {
+    if (req->vifr_fat_flow_src_prefix_h && req->vifr_fat_flow_src_prefix_h_size) {
         free(req->vifr_fat_flow_src_prefix_h);
         req->vifr_fat_flow_src_prefix_h = NULL;
         req->vifr_fat_flow_src_prefix_h_size = 0;
     }
-    if (req->vifr_fat_flow_src_prefix_l &&
-        req->vifr_fat_flow_src_prefix_l_size) {
+    if (req->vifr_fat_flow_src_prefix_l && req->vifr_fat_flow_src_prefix_l_size) {
         free(req->vifr_fat_flow_src_prefix_l);
         req->vifr_fat_flow_src_prefix_l = NULL;
         req->vifr_fat_flow_src_prefix_l_size = 0;
     }
-    if (req->vifr_fat_flow_src_prefix_mask &&
-        req->vifr_fat_flow_src_prefix_mask_size) {
+    if (req->vifr_fat_flow_src_prefix_mask && req->vifr_fat_flow_src_prefix_mask_size) {
         free(req->vifr_fat_flow_src_prefix_mask);
         req->vifr_fat_flow_src_prefix_mask = NULL;
         req->vifr_fat_flow_src_prefix_mask_size = 0;
     }
-    if (req->vifr_fat_flow_src_aggregate_plen &&
-        req->vifr_fat_flow_src_aggregate_plen_size) {
+    if (req->vifr_fat_flow_src_aggregate_plen && req->vifr_fat_flow_src_aggregate_plen_size) {
         free(req->vifr_fat_flow_src_aggregate_plen);
         req->vifr_fat_flow_src_aggregate_plen = NULL;
         req->vifr_fat_flow_src_aggregate_plen_size = 0;
     }
-    if (req->vifr_fat_flow_dst_prefix_h &&
-        req->vifr_fat_flow_dst_prefix_h_size) {
+    if (req->vifr_fat_flow_dst_prefix_h && req->vifr_fat_flow_dst_prefix_h_size) {
         free(req->vifr_fat_flow_dst_prefix_h);
         req->vifr_fat_flow_dst_prefix_h = NULL;
         req->vifr_fat_flow_dst_prefix_h_size = 0;
     }
-    if (req->vifr_fat_flow_dst_prefix_l &&
-        req->vifr_fat_flow_dst_prefix_l_size) {
+    if (req->vifr_fat_flow_dst_prefix_l && req->vifr_fat_flow_dst_prefix_l_size) {
         free(req->vifr_fat_flow_dst_prefix_l);
         req->vifr_fat_flow_dst_prefix_l = NULL;
         req->vifr_fat_flow_dst_prefix_l_size = 0;
     }
-    if (req->vifr_fat_flow_dst_prefix_mask &&
-        req->vifr_fat_flow_dst_prefix_mask_size) {
+    if (req->vifr_fat_flow_dst_prefix_mask && req->vifr_fat_flow_dst_prefix_mask_size) {
         free(req->vifr_fat_flow_dst_prefix_mask);
         req->vifr_fat_flow_dst_prefix_mask = NULL;
         req->vifr_fat_flow_dst_prefix_mask_size = 0;
     }
-    if (req->vifr_fat_flow_dst_aggregate_plen &&
-        req->vifr_fat_flow_dst_aggregate_plen_size) {
+    if (req->vifr_fat_flow_dst_aggregate_plen && req->vifr_fat_flow_dst_aggregate_plen_size) {
         free(req->vifr_fat_flow_dst_aggregate_plen);
         req->vifr_fat_flow_dst_aggregate_plen = NULL;
         req->vifr_fat_flow_dst_aggregate_plen_size = 0;
     }
 
-    if (req->vifr_fat_flow_exclude_ip_list_size &&
-           req->vifr_fat_flow_exclude_ip_list) {
+    if (req->vifr_fat_flow_exclude_ip_list_size && req->vifr_fat_flow_exclude_ip_list) {
         free(req->vifr_fat_flow_exclude_ip_list);
         req->vifr_fat_flow_exclude_ip_list = NULL;
         req->vifr_fat_flow_exclude_ip_list_size = 0;
     }
-    if (req->vifr_fat_flow_exclude_ip6_u_list_size &&
-           req->vifr_fat_flow_exclude_ip6_u_list) {
+    if (req->vifr_fat_flow_exclude_ip6_u_list_size && req->vifr_fat_flow_exclude_ip6_u_list) {
         free(req->vifr_fat_flow_exclude_ip6_u_list);
         req->vifr_fat_flow_exclude_ip6_u_list = NULL;
         req->vifr_fat_flow_exclude_ip6_u_list_size = 0;
     }
-    if (req->vifr_fat_flow_exclude_ip6_l_list_size &&
-           req->vifr_fat_flow_exclude_ip6_l_list) {
+    if (req->vifr_fat_flow_exclude_ip6_l_list_size && req->vifr_fat_flow_exclude_ip6_l_list) {
         free(req->vifr_fat_flow_exclude_ip6_l_list);
         req->vifr_fat_flow_exclude_ip6_l_list = NULL;
         req->vifr_fat_flow_exclude_ip6_l_list_size = 0;
@@ -1134,7 +1106,6 @@ vr_interface_req_destroy(vr_interface_req *req)
     free(req);
     return;
 }
-
 
 vr_interface_req *
 vr_interface_req_get_copy(vr_interface_req *src)
@@ -1185,18 +1156,15 @@ vr_interface_req_get_copy(vr_interface_req *src)
         memcpy(dst->vifr_name, src->vifr_name, strlen(src->vifr_name) + 1);
     }
 
-    if (src->vifr_queue_ierrors_to_lcore_size &&
-            src->vifr_queue_ierrors_to_lcore) {
-        dst->vifr_queue_ierrors_to_lcore =
-            malloc(src->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+    if (src->vifr_queue_ierrors_to_lcore_size && src->vifr_queue_ierrors_to_lcore) {
+        dst->vifr_queue_ierrors_to_lcore = malloc(src->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
         if (!dst->vifr_queue_ierrors_to_lcore)
             goto free_vif;
 
         memcpy(dst->vifr_queue_ierrors_to_lcore,
-                src->vifr_queue_ierrors_to_lcore,
-                src->vifr_queue_ierrors_to_lcore_size);
-        dst->vifr_queue_ierrors_to_lcore_size =
-            src->vifr_queue_ierrors_to_lcore_size;
+               src->vifr_queue_ierrors_to_lcore,
+               src->vifr_queue_ierrors_to_lcore_size);
+        dst->vifr_queue_ierrors_to_lcore_size = src->vifr_queue_ierrors_to_lcore_size;
     }
 
     if (src->vifr_mac && src->vifr_mac_size) {
@@ -1217,131 +1185,111 @@ vr_interface_req_get_copy(vr_interface_req *src)
         dst->vifr_src_mac_size = src->vifr_src_mac_size;
     }
 
-
-    if (src->vifr_fat_flow_protocol_port_size &&
-            src->vifr_fat_flow_protocol_port) {
-        dst->vifr_fat_flow_protocol_port =
-            malloc(src->vifr_fat_flow_protocol_port_size * sizeof(uint32_t));
+    if (src->vifr_fat_flow_protocol_port_size && src->vifr_fat_flow_protocol_port) {
+        dst->vifr_fat_flow_protocol_port = malloc(src->vifr_fat_flow_protocol_port_size * sizeof(uint32_t));
         if (!dst->vifr_fat_flow_protocol_port)
             goto free_vif;
 
         memcpy(dst->vifr_fat_flow_protocol_port,
-                src->vifr_fat_flow_protocol_port,
-                src->vifr_fat_flow_protocol_port_size);
-        dst->vifr_fat_flow_protocol_port_size =
-            src->vifr_fat_flow_protocol_port_size;
+               src->vifr_fat_flow_protocol_port,
+               src->vifr_fat_flow_protocol_port_size);
+        dst->vifr_fat_flow_protocol_port_size = src->vifr_fat_flow_protocol_port_size;
     }
 
-    if (src->vifr_fat_flow_src_prefix_h_size &&
-        src->vifr_fat_flow_src_prefix_h) {
-        dst->vifr_fat_flow_src_prefix_h =
-                   malloc(src->vifr_fat_flow_src_prefix_h_size * sizeof(uint64_t));
+    if (src->vifr_fat_flow_src_prefix_h_size && src->vifr_fat_flow_src_prefix_h) {
+        dst->vifr_fat_flow_src_prefix_h = malloc(src->vifr_fat_flow_src_prefix_h_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_src_prefix_h)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_src_prefix_h, src->vifr_fat_flow_src_prefix_h,
-               src->vifr_fat_flow_src_prefix_h_size);
+        memcpy(dst->vifr_fat_flow_src_prefix_h, src->vifr_fat_flow_src_prefix_h, src->vifr_fat_flow_src_prefix_h_size);
         dst->vifr_fat_flow_src_prefix_h_size = src->vifr_fat_flow_src_prefix_h_size;
     }
 
-    if (src->vifr_fat_flow_src_prefix_l_size &&
-        src->vifr_fat_flow_src_prefix_l) {
-        dst->vifr_fat_flow_src_prefix_l =
-                  malloc(src->vifr_fat_flow_src_prefix_l_size * sizeof(uint64_t));
+    if (src->vifr_fat_flow_src_prefix_l_size && src->vifr_fat_flow_src_prefix_l) {
+        dst->vifr_fat_flow_src_prefix_l = malloc(src->vifr_fat_flow_src_prefix_l_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_src_prefix_l)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_src_prefix_l, src->vifr_fat_flow_src_prefix_l,
-               src->vifr_fat_flow_src_prefix_l_size);
+        memcpy(dst->vifr_fat_flow_src_prefix_l, src->vifr_fat_flow_src_prefix_l, src->vifr_fat_flow_src_prefix_l_size);
         dst->vifr_fat_flow_src_prefix_l_size = src->vifr_fat_flow_src_prefix_l_size;
     }
-    if (src->vifr_fat_flow_src_prefix_mask_size &&
-        src->vifr_fat_flow_src_prefix_mask) {
-        dst->vifr_fat_flow_src_prefix_mask =
-                   malloc(src->vifr_fat_flow_src_prefix_mask_size * sizeof(uint8_t));
+    if (src->vifr_fat_flow_src_prefix_mask_size && src->vifr_fat_flow_src_prefix_mask) {
+        dst->vifr_fat_flow_src_prefix_mask = malloc(src->vifr_fat_flow_src_prefix_mask_size * sizeof(uint8_t));
         if (!dst->vifr_fat_flow_src_prefix_mask)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_src_prefix_mask, src->vifr_fat_flow_src_prefix_mask,
+        memcpy(dst->vifr_fat_flow_src_prefix_mask,
+               src->vifr_fat_flow_src_prefix_mask,
                src->vifr_fat_flow_src_prefix_mask_size);
         dst->vifr_fat_flow_src_prefix_mask_size = src->vifr_fat_flow_src_prefix_mask_size;
     }
-    if (src->vifr_fat_flow_src_aggregate_plen_size &&
-        src->vifr_fat_flow_src_aggregate_plen) {
-        dst->vifr_fat_flow_src_aggregate_plen =
-                   malloc(src->vifr_fat_flow_src_aggregate_plen_size * sizeof(uint8_t));
+    if (src->vifr_fat_flow_src_aggregate_plen_size && src->vifr_fat_flow_src_aggregate_plen) {
+        dst->vifr_fat_flow_src_aggregate_plen = malloc(src->vifr_fat_flow_src_aggregate_plen_size * sizeof(uint8_t));
         if (!dst->vifr_fat_flow_src_aggregate_plen)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_src_aggregate_plen, src->vifr_fat_flow_src_aggregate_plen,
+        memcpy(dst->vifr_fat_flow_src_aggregate_plen,
+               src->vifr_fat_flow_src_aggregate_plen,
                src->vifr_fat_flow_src_aggregate_plen_size);
         dst->vifr_fat_flow_src_aggregate_plen_size = src->vifr_fat_flow_src_aggregate_plen_size;
     }
-    if (src->vifr_fat_flow_dst_prefix_h_size &&
-        src->vifr_fat_flow_dst_prefix_h) {
-        dst->vifr_fat_flow_dst_prefix_h =
-                malloc(src->vifr_fat_flow_dst_prefix_h_size * sizeof(uint64_t));
+    if (src->vifr_fat_flow_dst_prefix_h_size && src->vifr_fat_flow_dst_prefix_h) {
+        dst->vifr_fat_flow_dst_prefix_h = malloc(src->vifr_fat_flow_dst_prefix_h_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_dst_prefix_h)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_dst_prefix_h, src->vifr_fat_flow_dst_prefix_h,
-               src->vifr_fat_flow_dst_prefix_h_size);
+        memcpy(dst->vifr_fat_flow_dst_prefix_h, src->vifr_fat_flow_dst_prefix_h, src->vifr_fat_flow_dst_prefix_h_size);
         dst->vifr_fat_flow_dst_prefix_h_size = src->vifr_fat_flow_dst_prefix_h_size;
     }
-    if (src->vifr_fat_flow_dst_prefix_l_size &&
-        src->vifr_fat_flow_dst_prefix_l) {
-        dst->vifr_fat_flow_dst_prefix_l =
-                 malloc(src->vifr_fat_flow_dst_prefix_l_size * sizeof(uint64_t));
+    if (src->vifr_fat_flow_dst_prefix_l_size && src->vifr_fat_flow_dst_prefix_l) {
+        dst->vifr_fat_flow_dst_prefix_l = malloc(src->vifr_fat_flow_dst_prefix_l_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_dst_prefix_l)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_dst_prefix_l, src->vifr_fat_flow_dst_prefix_l,
-               src->vifr_fat_flow_dst_prefix_l_size);
+        memcpy(dst->vifr_fat_flow_dst_prefix_l, src->vifr_fat_flow_dst_prefix_l, src->vifr_fat_flow_dst_prefix_l_size);
         dst->vifr_fat_flow_dst_prefix_l_size = src->vifr_fat_flow_dst_prefix_l_size;
     }
-    if (src->vifr_fat_flow_dst_prefix_mask_size &&
-        src->vifr_fat_flow_dst_prefix_mask) {
-        dst->vifr_fat_flow_dst_prefix_mask =
-                 malloc(src->vifr_fat_flow_dst_prefix_mask_size * sizeof(uint8_t));
+    if (src->vifr_fat_flow_dst_prefix_mask_size && src->vifr_fat_flow_dst_prefix_mask) {
+        dst->vifr_fat_flow_dst_prefix_mask = malloc(src->vifr_fat_flow_dst_prefix_mask_size * sizeof(uint8_t));
         if (!dst->vifr_fat_flow_dst_prefix_mask)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_dst_prefix_mask, src->vifr_fat_flow_dst_prefix_mask,
+        memcpy(dst->vifr_fat_flow_dst_prefix_mask,
+               src->vifr_fat_flow_dst_prefix_mask,
                src->vifr_fat_flow_dst_prefix_mask_size);
         dst->vifr_fat_flow_dst_prefix_mask_size = src->vifr_fat_flow_dst_prefix_mask_size;
     }
-    if (src->vifr_fat_flow_dst_aggregate_plen_size &&
-        src->vifr_fat_flow_dst_aggregate_plen) {
-        dst->vifr_fat_flow_dst_aggregate_plen =
-                  malloc(src->vifr_fat_flow_dst_aggregate_plen_size * sizeof(uint8_t));
+    if (src->vifr_fat_flow_dst_aggregate_plen_size && src->vifr_fat_flow_dst_aggregate_plen) {
+        dst->vifr_fat_flow_dst_aggregate_plen = malloc(src->vifr_fat_flow_dst_aggregate_plen_size * sizeof(uint8_t));
         if (!dst->vifr_fat_flow_dst_aggregate_plen)
             goto free_vif;
-        memcpy(dst->vifr_fat_flow_dst_aggregate_plen, src->vifr_fat_flow_dst_aggregate_plen,
+        memcpy(dst->vifr_fat_flow_dst_aggregate_plen,
+               src->vifr_fat_flow_dst_aggregate_plen,
                src->vifr_fat_flow_dst_aggregate_plen_size);
         dst->vifr_fat_flow_dst_aggregate_plen_size = src->vifr_fat_flow_dst_aggregate_plen_size;
     }
 
-    if (src->vifr_fat_flow_exclude_ip_list_size &&
-             src->vifr_fat_flow_exclude_ip_list) {
+    if (src->vifr_fat_flow_exclude_ip_list_size && src->vifr_fat_flow_exclude_ip_list) {
         dst->vifr_fat_flow_exclude_ip_list = malloc(src->vifr_fat_flow_exclude_ip_list_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_exclude_ip_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip_list, src->vifr_fat_flow_exclude_ip_list,
+        memcpy(dst->vifr_fat_flow_exclude_ip_list,
+               src->vifr_fat_flow_exclude_ip_list,
                src->vifr_fat_flow_exclude_ip_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip_list_size = src->vifr_fat_flow_exclude_ip_list_size;
     }
 
-    if (src->vifr_fat_flow_exclude_ip6_u_list_size &&
-            src->vifr_fat_flow_exclude_ip6_u_list) {
+    if (src->vifr_fat_flow_exclude_ip6_u_list_size && src->vifr_fat_flow_exclude_ip6_u_list) {
         dst->vifr_fat_flow_exclude_ip6_u_list = malloc(src->vifr_fat_flow_exclude_ip6_u_list_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_exclude_ip6_u_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip6_u_list, src->vifr_fat_flow_exclude_ip6_u_list,
+        memcpy(dst->vifr_fat_flow_exclude_ip6_u_list,
+               src->vifr_fat_flow_exclude_ip6_u_list,
                src->vifr_fat_flow_exclude_ip6_u_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip6_u_list_size = src->vifr_fat_flow_exclude_ip6_u_list_size;
     }
-    if (src->vifr_fat_flow_exclude_ip6_l_list_size &&
-            src->vifr_fat_flow_exclude_ip6_l_list) {
+    if (src->vifr_fat_flow_exclude_ip6_l_list_size && src->vifr_fat_flow_exclude_ip6_l_list) {
         dst->vifr_fat_flow_exclude_ip6_l_list = malloc(src->vifr_fat_flow_exclude_ip6_l_list_size * sizeof(uint64_t));
         if (!dst->vifr_fat_flow_exclude_ip6_l_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip6_l_list, src->vifr_fat_flow_exclude_ip6_l_list,
+        memcpy(dst->vifr_fat_flow_exclude_ip6_l_list,
+               src->vifr_fat_flow_exclude_ip6_l_list,
                src->vifr_fat_flow_exclude_ip6_l_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip6_l_list_size = src->vifr_fat_flow_exclude_ip6_l_list_size;
     }
@@ -1355,8 +1303,7 @@ free_vif:
 }
 
 int
-vr_send_interface_dump(struct nl_client *cl, unsigned int router_id,
-        int marker, int core)
+vr_send_interface_dump(struct nl_client *cl, unsigned int router_id, int marker, int core)
 {
     vr_interface_req req;
 
@@ -1369,8 +1316,12 @@ vr_send_interface_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_interface_get(struct nl_client *cl, unsigned int router_id,
-        int vif_index, int os_index, int core, int get_drops)
+vr_send_interface_get(struct nl_client *cl,
+                      unsigned int router_id,
+                      int vif_index,
+                      int os_index,
+                      int core,
+                      int get_drops)
 {
     vr_interface_req req;
 
@@ -1388,8 +1339,7 @@ vr_send_interface_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_interface_delete(struct nl_client *cl, unsigned int router_id,
-        char *vif_name, int vif_index)
+vr_send_interface_delete(struct nl_client *cl, unsigned int router_id, char *vif_name, int vif_index)
 {
     vr_interface_req req;
 
@@ -1404,10 +1354,19 @@ vr_send_interface_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
-        int os_index, int vif_index, int *vif_xconnect_index, int vif_type,
-        unsigned int vrf, unsigned int flags, int8_t *vif_mac, int8_t vif_transport,
-        const char *guid)
+vr_send_interface_add(struct nl_client *cl,
+                      int router_id,
+                      char *vif_name,
+                      int os_index,
+                      int vif_index,
+                      int *vif_xconnect_index,
+                      int vif_type,
+                      unsigned int vrf,
+                      unsigned int flags,
+                      int8_t *vif_mac,
+                      int8_t vif_transport,
+                      const char *guid,
+                      int nh_id)
 {
     int platform, i = 0;
     vr_interface_req req;
@@ -1433,10 +1392,11 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
     req.vifr_type = vif_type;
     req.vifr_flags = flags;
     req.vifr_transport = vif_transport;
+    req.vifr_nh_id = nh_id;
 
     if (vif_type == VIF_TYPE_HOST) {
-        for(i = 0; i < VR_MAX_PHY_INF; i++) {
-            if(vif_xconnect_index[i] < 0) {
+        for (i = 0; i < VR_MAX_PHY_INF; i++) {
+            if (vif_xconnect_index[i] < 0) {
                 break;
             }
         }
@@ -1448,8 +1408,7 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
 }
 
 int
-vr_send_vif_clear_stats(struct nl_client *cl, unsigned int router_id,
-        int vif_idx, int core)
+vr_send_vif_clear_stats(struct nl_client *cl, unsigned int router_id, int vif_idx, int core)
 {
     vr_interface_req req;
 
@@ -1463,7 +1422,6 @@ vr_send_vif_clear_stats(struct nl_client *cl, unsigned int router_id,
 }
 
 /* interface end */
-
 
 int
 vr_send_mem_stats_get(struct nl_client *cl, unsigned int router_id)
@@ -1507,8 +1465,7 @@ vr_mirror_req_get_copy(vr_mirror_req *req)
 }
 
 int
-vr_send_mirror_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_mirror_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_mirror_req req;
 
@@ -1520,8 +1477,7 @@ vr_send_mirror_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_mirror_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int mirror_index)
+vr_send_mirror_get(struct nl_client *cl, unsigned int router_id, unsigned int mirror_index)
 {
     vr_mirror_req req;
 
@@ -1533,8 +1489,7 @@ vr_send_mirror_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_mirror_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int mirror_index)
+vr_send_mirror_delete(struct nl_client *cl, unsigned int router_id, unsigned int mirror_index)
 {
     vr_mirror_req req;
 
@@ -1546,9 +1501,12 @@ vr_send_mirror_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_mirror_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int mirror_index, int mirror_nh_index,
-        unsigned int mirror_flags, int vni_id)
+vr_send_mirror_add(struct nl_client *cl,
+                   unsigned int router_id,
+                   unsigned int mirror_index,
+                   int mirror_nh_index,
+                   unsigned int mirror_flags,
+                   int vni_id)
 {
     vr_mirror_req req;
 
@@ -1566,8 +1524,7 @@ vr_send_mirror_add(struct nl_client *cl, unsigned int router_id,
 /* mirror end */
 
 int
-vr_send_vrf_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_vrf_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_vrf_req req;
 
@@ -1579,8 +1536,7 @@ vr_send_vrf_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vrf_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int vrf_index)
+vr_send_vrf_get(struct nl_client *cl, unsigned int router_id, unsigned int vrf_index)
 {
     vr_vrf_req req;
 
@@ -1592,8 +1548,7 @@ vr_send_vrf_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vrf_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int vrf_index)
+vr_send_vrf_delete(struct nl_client *cl, unsigned int router_id, unsigned int vrf_index)
 {
     vr_vrf_req req;
 
@@ -1605,9 +1560,12 @@ vr_send_vrf_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vrf_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int vrf_index, int hbfl_idx, int hbfr_idx,
-        unsigned int vrf_flags)
+vr_send_vrf_add(struct nl_client *cl,
+                unsigned int router_id,
+                unsigned int vrf_index,
+                int hbfl_idx,
+                int hbfr_idx,
+                unsigned int vrf_flags)
 {
     vr_vrf_req req;
 
@@ -1624,8 +1582,7 @@ vr_send_vrf_add(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_mpls_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int label)
+vr_send_mpls_delete(struct nl_client *cl, unsigned int router_id, unsigned int label)
 {
     vr_mpls_req req;
 
@@ -1664,8 +1621,7 @@ vr_send_mpls_get(struct nl_client *cl, unsigned int router_id, unsigned int labe
 }
 
 int
-vr_send_mpls_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int label, unsigned int nh_index)
+vr_send_mpls_add(struct nl_client *cl, unsigned int router_id, unsigned int label, unsigned int nh_index)
 {
     vr_mpls_req req;
 
@@ -1718,13 +1674,12 @@ vr_nexthop_type_string(vr_nexthop_req *nh)
         return "L2_RECEIVE";
         break;
 
-     default:
+    default:
         return "NONE";
     }
 
     return "NONE";
 }
-
 
 bool
 vr_nexthop_req_has_vif(vr_nexthop_req *req)
@@ -1841,8 +1796,7 @@ vr_nexthop_req_get_copy(vr_nexthop_req *src)
         dst->nhr_nh_list = malloc(src->nhr_nh_list_size * sizeof(uint32_t));
         if (!src->nhr_nh_list)
             goto free_nh;
-        memcpy(dst->nhr_nh_list, src->nhr_nh_list,
-                src->nhr_nh_list_size * sizeof(uint32_t));
+        memcpy(dst->nhr_nh_list, src->nhr_nh_list, src->nhr_nh_list_size * sizeof(uint32_t));
         dst->nhr_nh_list_size = src->nhr_nh_list_size;
     }
 
@@ -1851,8 +1805,7 @@ vr_nexthop_req_get_copy(vr_nexthop_req *src)
         dst->nhr_label_list = malloc(src->nhr_label_list_size * sizeof(uint32_t));
         if (!src->nhr_label_list)
             goto free_nh;
-        memcpy(dst->nhr_label_list, src->nhr_label_list,
-                src->nhr_label_list_size * sizeof(uint32_t));
+        memcpy(dst->nhr_label_list, src->nhr_label_list, src->nhr_label_list_size * sizeof(uint32_t));
         dst->nhr_label_list_size = src->nhr_label_list_size;
     }
 
@@ -1879,19 +1832,16 @@ vr_nexthop_req_get_copy(vr_nexthop_req *src)
         dst->nhr_encap_oif_id = malloc(src->nhr_encap_oif_id_size * sizeof(int32_t));
         if (!src->nhr_encap_oif_id)
             goto free_nh;
-        memcpy(dst->nhr_encap_oif_id, src->nhr_encap_oif_id,
-                src->nhr_encap_oif_id_size * sizeof(int32_t));
+        memcpy(dst->nhr_encap_oif_id, src->nhr_encap_oif_id, src->nhr_encap_oif_id_size * sizeof(int32_t));
         dst->nhr_encap_oif_id_size = src->nhr_encap_oif_id_size;
     }
 
     /* encap valid list */
-    if (src->nhr_encap_valid_size && src->nhr_encap_valid &&
-            (src->nhr_flags & NH_FLAG_TUNNEL_UNDERLAY_ECMP)) {
+    if (src->nhr_encap_valid_size && src->nhr_encap_valid && (src->nhr_flags & NH_FLAG_TUNNEL_UNDERLAY_ECMP)) {
         dst->nhr_encap_valid = malloc(src->nhr_encap_valid_size * sizeof(int32_t));
         if (!src->nhr_encap_valid)
             goto free_nh;
-        memcpy(dst->nhr_encap_valid, src->nhr_encap_valid,
-                src->nhr_encap_valid_size * sizeof(int32_t));
+        memcpy(dst->nhr_encap_valid, src->nhr_encap_valid, src->nhr_encap_valid_size * sizeof(int32_t));
         dst->nhr_encap_valid_size = src->nhr_encap_valid_size;
     }
 
@@ -1903,8 +1853,7 @@ free_nh:
 }
 
 int
-vr_send_nexthop_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int nh_index)
+vr_send_nexthop_delete(struct nl_client *cl, unsigned int router_id, unsigned int nh_index)
 {
     vr_nexthop_req req;
 
@@ -1917,8 +1866,7 @@ vr_send_nexthop_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_nexthop_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_nexthop_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_nexthop_req req;
 
@@ -1931,8 +1879,7 @@ vr_send_nexthop_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_nexthop_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int nh_index)
+vr_send_nexthop_get(struct nl_client *cl, unsigned int router_id, unsigned int nh_index)
 {
     vr_nexthop_req req;
 
@@ -1945,9 +1892,14 @@ vr_send_nexthop_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_pbb_tunnel_add(struct nl_client *cl, unsigned int router_id, int
-        nh_index, unsigned int flags, int vrf_index, int8_t *bmac,
-        unsigned int direct_nh_id, unsigned int direct_label)
+vr_send_pbb_tunnel_add(struct nl_client *cl,
+                       unsigned int router_id,
+                       int nh_index,
+                       unsigned int flags,
+                       int vrf_index,
+                       int8_t *bmac,
+                       unsigned int direct_nh_id,
+                       unsigned int direct_label)
 {
     int ret = 0;
     unsigned int i;
@@ -2011,10 +1963,15 @@ fail:
 }
 
 int
-vr_send_nexthop_composite_add(struct nl_client *cl, unsigned int router_id,
-        int nh_index, unsigned int flags, int vrf_index,
-        unsigned int num_components, unsigned int *component_nh_indices,
-        unsigned int *component_labels, unsigned int family)
+vr_send_nexthop_composite_add(struct nl_client *cl,
+                              unsigned int router_id,
+                              int nh_index,
+                              unsigned int flags,
+                              int vrf_index,
+                              unsigned int num_components,
+                              unsigned int *component_nh_indices,
+                              unsigned int *component_labels,
+                              unsigned int family)
 {
     int ret = 0;
     unsigned int i;
@@ -2047,7 +2004,6 @@ vr_send_nexthop_composite_add(struct nl_client *cl, unsigned int router_id,
         req.nhr_label_list[i] = component_labels[i];
     }
 
-
     req.nhr_family = family;
 
     ret = vr_sendmsg(cl, &req, "vr_nexthop_req");
@@ -2065,13 +2021,23 @@ fail:
     return ret;
 }
 
-
 int
-vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int type, int nh_index, unsigned int flags, int vrf_index,
-        int *vif_index, int8_t smac[][6], int8_t dmac[][6], struct in_addr sip,
-        struct in_addr dip, int sport, int dport, int8_t *l3_vxlan_mac, int family,
-        int count)
+vr_send_nexthop_encap_tunnel_add(struct nl_client *cl,
+                                 unsigned int router_id,
+                                 unsigned int type,
+                                 int nh_index,
+                                 unsigned int flags,
+                                 int vrf_index,
+                                 int *vif_index,
+                                 int8_t smac[][6],
+                                 int8_t dmac[][6],
+                                 struct in_addr sip,
+                                 struct in_addr dip,
+                                 int sport,
+                                 int dport,
+                                 int8_t *l3_vxlan_mac,
+                                 int family,
+                                 int count)
 {
     vr_nexthop_req req;
     int i;
@@ -2102,8 +2068,7 @@ vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
                 req.nhr_encap_valid[i] = 1;
             req.nhr_encap_oif_id[i] = vif_index[i];
         }
-    }
-    else
+    } else
         req.nhr_encap_oif_id[0] = vif_index[0];
     if (count)
         req.nhr_encap_len = 14;
@@ -2112,9 +2077,9 @@ vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
     if (!req.nhr_encap)
         return -ENOMEM;
     for (i = 0; i < count; i++) {
-        memcpy(req.nhr_encap + i*14, dmac, 6);
-        memcpy(req.nhr_encap + i*14 + 6, smac, 6);
-        *(uint16_t *)(&req.nhr_encap[12 + i*14]) = htons(0x0800);
+        memcpy(req.nhr_encap + i * 14, dmac, 6);
+        memcpy(req.nhr_encap + i * 14 + 6, smac, 6);
+        *(uint16_t *)(&req.nhr_encap[12 + i * 14]) = htons(0x0800);
     }
 
 #if defined(__linux__)
@@ -2144,9 +2109,14 @@ vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_nexthop_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int type, int nh_index, unsigned int flags, int vrf_index,
-        int *vif_index, int family)
+vr_send_nexthop_add(struct nl_client *cl,
+                    unsigned int router_id,
+                    unsigned int type,
+                    int nh_index,
+                    unsigned int flags,
+                    int vrf_index,
+                    int *vif_index,
+                    int family)
 {
     vr_nexthop_req req;
 
@@ -2194,7 +2164,7 @@ vr_route_req_destroy(vr_route_req *req)
 void
 address_mask(uint8_t *addr, uint8_t plen, unsigned int family)
 {
-   int i;
+    int i;
     uint8_t address_bits;
     uint8_t mask[VR_IP6_ADDRESS_LEN];
 
@@ -2258,8 +2228,7 @@ free_rtr_req:
 }
 
 int
-vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vrf,
-        unsigned int family, uint8_t *marker)
+vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vrf, unsigned int family, uint8_t *marker)
 {
     vr_route_req req;
 
@@ -2283,10 +2252,18 @@ vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vr
 }
 
 static int
-vr_send_route_common(struct nl_client *cl, unsigned int op,
-        unsigned int router_id, unsigned int vrf, unsigned int family,
-        uint8_t *prefix, unsigned int prefix_len, unsigned int nh_index,
-        int label, uint8_t *mac, uint32_t replace_len, unsigned int flags)
+vr_send_route_common(struct nl_client *cl,
+                     unsigned int op,
+                     unsigned int router_id,
+                     unsigned int vrf,
+                     unsigned int family,
+                     uint8_t *prefix,
+                     unsigned int prefix_len,
+                     unsigned int nh_index,
+                     int label,
+                     uint8_t *mac,
+                     uint32_t replace_len,
+                     unsigned int flags)
 {
     vr_route_req req;
 
@@ -2322,39 +2299,73 @@ vr_send_route_common(struct nl_client *cl, unsigned int op,
 
 int
 vr_send_route_get(struct nl_client *cl,
-        unsigned int router_id, unsigned int vrf, unsigned int family,
-        uint8_t *prefix, unsigned int prefix_len, uint8_t *mac)
+                  unsigned int router_id,
+                  unsigned int vrf,
+                  unsigned int family,
+                  uint8_t *prefix,
+                  unsigned int prefix_len,
+                  uint8_t *mac)
 {
-    return vr_send_route_common(cl, SANDESH_OP_GET, router_id, vrf,
-            family, prefix, prefix_len, 0, 0, mac, 0, 0);
+    return vr_send_route_common(cl, SANDESH_OP_GET, router_id, vrf, family, prefix, prefix_len, 0, 0, mac, 0, 0);
 }
 
 int
 vr_send_route_delete(struct nl_client *cl,
-        unsigned int router_id, unsigned int vrf, unsigned int family,
-        uint8_t *prefix, unsigned int prefix_len, unsigned int nh_index,
-        int label, uint8_t *mac, uint32_t replace_len, unsigned int flags)
+                     unsigned int router_id,
+                     unsigned int vrf,
+                     unsigned int family,
+                     uint8_t *prefix,
+                     unsigned int prefix_len,
+                     unsigned int nh_index,
+                     int label,
+                     uint8_t *mac,
+                     uint32_t replace_len,
+                     unsigned int flags)
 {
-    return vr_send_route_common(cl, SANDESH_OP_DEL, router_id, vrf,
-            family, prefix, prefix_len, nh_index, label,
-            mac, replace_len, flags);
+    return vr_send_route_common(cl,
+                                SANDESH_OP_DEL,
+                                router_id,
+                                vrf,
+                                family,
+                                prefix,
+                                prefix_len,
+                                nh_index,
+                                label,
+                                mac,
+                                replace_len,
+                                flags);
 }
 
 int
 vr_send_route_add(struct nl_client *cl,
-        unsigned int router_id, unsigned int vrf, unsigned int family,
-        uint8_t *prefix, unsigned int prefix_len, unsigned int nh_index,
-        int label, uint8_t *mac, uint32_t replace_len, unsigned int flags)
+                  unsigned int router_id,
+                  unsigned int vrf,
+                  unsigned int family,
+                  uint8_t *prefix,
+                  unsigned int prefix_len,
+                  unsigned int nh_index,
+                  int label,
+                  uint8_t *mac,
+                  uint32_t replace_len,
+                  unsigned int flags)
 {
-    return vr_send_route_common(cl, SANDESH_OP_ADD, router_id, vrf,
-            family, prefix, prefix_len, nh_index, label,
-            mac, replace_len,flags);
+    return vr_send_route_common(cl,
+                                SANDESH_OP_ADD,
+                                router_id,
+                                vrf,
+                                family,
+                                prefix,
+                                prefix_len,
+                                nh_index,
+                                label,
+                                mac,
+                                replace_len,
+                                flags);
 }
 
 /* vrf assign start */
 int
-vr_send_vrf_assign_dump(struct nl_client *cl, unsigned int router_id,
-        unsigned int vif_index, int marker)
+vr_send_vrf_assign_dump(struct nl_client *cl, unsigned int router_id, unsigned int vif_index, int marker)
 {
     vr_vrf_assign_req req;
 
@@ -2368,8 +2379,11 @@ vr_send_vrf_assign_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vrf_assign_set(struct nl_client *cl, unsigned int router_id,
-        unsigned int vif_index, unsigned int vlan_id, unsigned int vrf_id)
+vr_send_vrf_assign_set(struct nl_client *cl,
+                       unsigned int router_id,
+                       unsigned int vif_index,
+                       unsigned int vlan_id,
+                       unsigned int vrf_id)
 {
 
     vr_vrf_assign_req req;
@@ -2400,8 +2414,7 @@ vr_send_vrf_stats_dump(struct nl_client *cl, unsigned int router_id, int marker)
 }
 
 int
-vr_send_vrf_stats_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int vrf)
+vr_send_vrf_stats_get(struct nl_client *cl, unsigned int router_id, unsigned int vrf)
 {
     vr_vrf_stats_req req;
 
@@ -2426,9 +2439,13 @@ vr_send_vrouter_get(struct nl_client *cl, unsigned int router_id)
 }
 
 int
-vr_send_vrouter_set_logging(struct nl_client *cl, unsigned int router_id,
-        unsigned int log_level, unsigned int *e_log_types, unsigned int e_size,
-        unsigned int *d_log_types, unsigned int d_size)
+vr_send_vrouter_set_logging(struct nl_client *cl,
+                            unsigned int router_id,
+                            unsigned int log_level,
+                            unsigned int *e_log_types,
+                            unsigned int e_size,
+                            unsigned int *d_log_types,
+                            unsigned int d_size)
 {
     vrouter_ops req;
 
@@ -2473,12 +2490,27 @@ vr_send_vrouter_set_logging(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
-        int perfr, int perfs, int from_vm_mss_adj, int to_vm_mss_adj,
-        int perfr1, int perfr2, int perfr3, int perfp, int perfq1,
-        int perfq2, int perfq3, int udp_coff, int flow_hold_limit,
-        int mudp, int btokens, int binterval, int bstep,
-        unsigned int priority_tagging, int packet_dump)
+vr_send_vrouter_set_runtime_opts(struct nl_client *cl,
+                                 unsigned int router_id,
+                                 int perfr,
+                                 int perfs,
+                                 int from_vm_mss_adj,
+                                 int to_vm_mss_adj,
+                                 int perfr1,
+                                 int perfr2,
+                                 int perfr3,
+                                 int perfp,
+                                 int perfq1,
+                                 int perfq2,
+                                 int perfq3,
+                                 int udp_coff,
+                                 int flow_hold_limit,
+                                 int mudp,
+                                 int btokens,
+                                 int binterval,
+                                 int bstep,
+                                 unsigned int priority_tagging,
+                                 int packet_dump)
 {
     vrouter_ops req;
 
@@ -2522,8 +2554,7 @@ vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vxlan_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int vnid)
+vr_send_vxlan_delete(struct nl_client *cl, unsigned int router_id, unsigned int vnid)
 {
     vr_vxlan_req req;
 
@@ -2535,8 +2566,7 @@ vr_send_vxlan_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vxlan_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_vxlan_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_vxlan_req req;
 
@@ -2548,8 +2578,7 @@ vr_send_vxlan_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vxlan_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int vnid)
+vr_send_vxlan_get(struct nl_client *cl, unsigned int router_id, unsigned int vnid)
 {
     vr_vxlan_req req;
 
@@ -2561,8 +2590,7 @@ vr_send_vxlan_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_vxlan_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int vnid, unsigned int nh_index)
+vr_send_vxlan_add(struct nl_client *cl, unsigned int router_id, unsigned int vnid, unsigned int nh_index)
 {
     vr_vxlan_req req;
 
@@ -2575,8 +2603,7 @@ vr_send_vxlan_add(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_fc_map_get(struct nl_client *cl, unsigned int router_id,
-        uint8_t fc_map_id)
+vr_send_fc_map_get(struct nl_client *cl, unsigned int router_id, uint8_t fc_map_id)
 {
     vr_fc_map_req req;
     int16_t id = fc_map_id;
@@ -2591,8 +2618,7 @@ vr_send_fc_map_get(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_fc_map_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_fc_map_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_fc_map_req req;
 
@@ -2605,8 +2631,7 @@ vr_send_fc_map_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_fc_map_delete(struct nl_client *cl, unsigned int router_id,
-        uint8_t fc_id)
+vr_send_fc_map_delete(struct nl_client *cl, unsigned int router_id, uint8_t fc_id)
 {
     vr_fc_map_req req;
     int16_t id = fc_id;
@@ -2621,9 +2646,14 @@ vr_send_fc_map_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_fc_map_add(struct nl_client *cl, unsigned int router_id,
-        int16_t *fc_id, uint8_t fc_id_size,
-        uint8_t *dscp, uint8_t *mpls_qos, uint8_t *dotonep, uint8_t *queue)
+vr_send_fc_map_add(struct nl_client *cl,
+                   unsigned int router_id,
+                   int16_t *fc_id,
+                   uint8_t fc_id_size,
+                   uint8_t *dscp,
+                   uint8_t *mpls_qos,
+                   uint8_t *dotonep,
+                   uint8_t *queue)
 {
     vr_fc_map_req req;
 
@@ -2645,8 +2675,7 @@ vr_send_fc_map_add(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_qos_map_get(struct nl_client *cl, unsigned int router_id,
-        unsigned int qos_map_id)
+vr_send_qos_map_get(struct nl_client *cl, unsigned int router_id, unsigned int qos_map_id)
 {
     vr_qos_map_req req;
 
@@ -2658,10 +2687,8 @@ vr_send_qos_map_get(struct nl_client *cl, unsigned int router_id,
     return vr_sendmsg(cl, &req, "vr_qos_map_req");
 }
 
-
 int
-vr_send_qos_map_dump(struct nl_client *cl, unsigned int router_id,
-        int marker)
+vr_send_qos_map_dump(struct nl_client *cl, unsigned int router_id, int marker)
 {
     vr_qos_map_req req;
 
@@ -2674,8 +2701,7 @@ vr_send_qos_map_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_qos_map_delete(struct nl_client *cl, unsigned int router_id,
-        unsigned int qos_map_id)
+vr_send_qos_map_delete(struct nl_client *cl, unsigned int router_id, unsigned int qos_map_id)
 {
     vr_qos_map_req req;
 
@@ -2688,11 +2714,18 @@ vr_send_qos_map_delete(struct nl_client *cl, unsigned int router_id,
 }
 
 int
-vr_send_qos_map_add(struct nl_client *cl, unsigned int router_id,
-        unsigned int qos_id,
-        uint8_t *dscp, uint8_t num_dscp, uint8_t *dscp_fc_id,
-        uint8_t *mpls_qos, uint8_t num_mpls_qos, uint8_t *mpls_qos_fc_id,
-        uint8_t *dotonep, uint8_t num_dotonep, uint8_t *dotonep_fc_id)
+vr_send_qos_map_add(struct nl_client *cl,
+                    unsigned int router_id,
+                    unsigned int qos_id,
+                    uint8_t *dscp,
+                    uint8_t num_dscp,
+                    uint8_t *dscp_fc_id,
+                    uint8_t *mpls_qos,
+                    uint8_t num_mpls_qos,
+                    uint8_t *mpls_qos_fc_id,
+                    uint8_t *dotonep,
+                    uint8_t num_dotonep,
+                    uint8_t *dotonep_fc_id)
 {
     vr_qos_map_req req;
 
@@ -2732,7 +2765,7 @@ vr_send_ddp_req(struct nl_client *cl, vr_info_msg_en msginfo, uint8_t *vr_info_i
 
     memset(&req, 0, sizeof(req));
 
-    req.h_op        = SANDESH_OP_DUMP;
+    req.h_op = SANDESH_OP_DUMP;
     req.vdu_msginfo = msginfo;
 
     if (vr_info_inbuf != NULL) {

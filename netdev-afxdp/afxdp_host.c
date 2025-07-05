@@ -35,481 +35,548 @@
 #include "host/vr_host_packet.h"
 #include "ulinux.h"
 
+/* RCU callback */
+extern void vr_flow_defer_cb(struct vrouter *router, void *arg);
+extern void vr_htable_hentry_scheduled_delete(void *arg);
+
+struct vr_afxdp_work_cb_data {
+    void (*dwc_fn)(void *);
+    void *dwc_data;
+};
+
 #define PAGE_SIZE 4096
 
 void
 add_timer(struct dummy_timer_list *dummy)
 {
-  return;
+    return;
 }
 
 void
 init_timer(struct dummy_timer_list *dummy)
 {
-  return;
+    return;
 }
 
 time_t
 get_time()
 {
-  return time(NULL);
+    return time(NULL);
 }
 
 void
 ulinux_timer(unsigned long data)
 {
-  return;
+    return;
 }
 
 static void *
 vr_lib_malloc(__u32 size, __u32 object)
 {
-  return malloc(size);
+    return malloc(size);
 }
 
 static void *
 vr_lib_zalloc(__u32 size, __u32 object)
 {
-  return calloc(size, 1);
+    return calloc(size, 1);
 }
 
 static void
 vr_lib_free(void *mem, __u32 object)
 {
-  if (mem)
-    free(mem);
-  return;
+    if (mem)
+        free(mem);
+    return;
 }
 
 static int
 vr_lib_printf(const char *format, ...)
 {
-  int printed;
-  va_list args;
+    int printed;
+    va_list args;
 
-  va_start(args, format);
-  printed = printf(format, args);
-  va_end(args);
+    va_start(args, format);
+    printed = printf(format, args);
+    va_end(args);
 
-  return printed;
+    return printed;
 }
 
 static struct vr_packet *
 vr_lib_get_packet(struct vr_hpacket *hpkt, struct vr_interface *vif)
 {
-  struct vr_packet *pkt;
+    struct vr_packet *pkt;
 
-  pkt = &hpkt->hp_packet;
-  pkt->vp_head = hpkt->hp_head;
-  pkt->vp_data = hpkt->hp_data;
-  pkt->vp_tail = hpkt->hp_tail;
-  pkt->vp_end = hpkt->hp_end;
-  pkt->vp_len = hpkt_head_len(hpkt);
-  pkt->vp_if = vif;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_head = hpkt->hp_head;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_tail = hpkt->hp_tail;
+    pkt->vp_end = hpkt->hp_end;
+    pkt->vp_len = hpkt_head_len(hpkt);
+    pkt->vp_if = vif;
 
-  return pkt;
+    return pkt;
 }
 
 int
-vr_hpacket_copy(unsigned char *dst,
-                struct vr_hpacket *hpkt_src,
-                __u32 offset,
-                __u32 len)
+vr_hpacket_copy(unsigned char *dst, struct vr_hpacket *hpkt_src, __u32 offset, __u32 len)
 {
-  __u16 tocopy, copied;
-  unsigned char *src;
+    __u16 tocopy, copied;
+    unsigned char *src;
 
-  while (hpkt_src && offset > hpkt_src->hp_end) {
-    offset -= (hpkt_src->hp_tail - hpkt_src->hp_data);
-    hpkt_src = hpkt_src->hp_next;
-  }
+    while (hpkt_src && offset > hpkt_src->hp_end) {
+        offset -= (hpkt_src->hp_tail - hpkt_src->hp_data);
+        hpkt_src = hpkt_src->hp_next;
+    }
 
-  if (!hpkt_src)
-    return -EINVAL;
-
-  tocopy = len;
-  src = hpkt_src->hp_head + hpkt_src->hp_data + offset;
-  copied = 0;
-
-  while (len) {
-    if (len > hpkt_src->hp_tail - (hpkt_src->hp_data + offset))
-      tocopy = hpkt_src->hp_tail - (hpkt_src->hp_data + offset);
-    memcpy(dst + copied, src, tocopy);
-    len -= tocopy;
-    copied += tocopy;
-    hpkt_src = hpkt_src->hp_next;
     if (!hpkt_src)
-      return copied;
-    src = hpkt_data(hpkt_src);
-  }
+        return -EINVAL;
 
-  return copied;
+    tocopy = len;
+    src = hpkt_src->hp_head + hpkt_src->hp_data + offset;
+    copied = 0;
+
+    while (len) {
+        if (len > hpkt_src->hp_tail - (hpkt_src->hp_data + offset))
+            tocopy = hpkt_src->hp_tail - (hpkt_src->hp_data + offset);
+        memcpy(dst + copied, src, tocopy);
+        len -= tocopy;
+        copied += tocopy;
+        hpkt_src = hpkt_src->hp_next;
+        if (!hpkt_src)
+            return copied;
+        src = hpkt_data(hpkt_src);
+    }
+
+    return copied;
 }
 
 void
 vr_hpacket_free(struct vr_hpacket *hpkt)
 {
-  struct vr_hpacket_tail *hpkt_tail;
-  struct vr_hpacket *hpkt_next;
+    struct vr_hpacket_tail *hpkt_tail;
+    struct vr_hpacket *hpkt_next;
 
-  while (hpkt) {
-    hpkt_next = hpkt->hp_next;
-    hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-    hpkt_tail->hp_users--;
-    if (hpkt->hp_flags & VR_HPACKET_FLAGS_CLONED) {
-      if (!hpkt_tail->hp_users)
-        free(hpkt->hp_head);
-      free(hpkt);
-      return;
-    }
-
-    if (hpkt->hp_pool) {
-      if (hpkt_tail->hp_users) {
-        hpkt->hp_head = malloc(hpkt->hp_end + sizeof(struct vr_hpacket_tail));
+    while (hpkt) {
+        hpkt_next = hpkt->hp_next;
         hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-        hpkt_tail->hp_users = 1;
-      }
-      vr_hpacket_pool_free(hpkt);
-    } else {
-      free(hpkt->hp_head);
-      free(hpkt);
+        hpkt_tail->hp_users--;
+        if (hpkt->hp_flags & VR_HPACKET_FLAGS_CLONED) {
+            if (!hpkt_tail->hp_users)
+                free(hpkt->hp_head);
+            free(hpkt);
+            return;
+        }
+
+        if (hpkt->hp_pool) {
+            if (hpkt_tail->hp_users) {
+                hpkt->hp_head = malloc(hpkt->hp_end + sizeof(struct vr_hpacket_tail));
+                hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
+                hpkt_tail->hp_users = 1;
+            }
+            vr_hpacket_pool_free(hpkt);
+        } else {
+            free(hpkt->hp_head);
+            free(hpkt);
+        }
+
+        hpkt = hpkt_next;
     }
 
-    hpkt = hpkt_next;
-  }
-
-  return;
+    return;
 }
 
 struct vr_hpacket *
 vr_hpacket_alloc(__u32 size)
 {
-  struct vr_hpacket *hpkt;
-  struct vr_hpacket_tail *hpkt_tail;
-  struct vr_packet *pkt;
+    struct vr_hpacket *hpkt;
+    struct vr_hpacket_tail *hpkt_tail;
+    struct vr_packet *pkt;
 
-  hpkt = (struct vr_hpacket *)malloc(sizeof(*hpkt));
-  if (!hpkt)
-    return NULL;
+    hpkt = (struct vr_hpacket *)malloc(sizeof(*hpkt));
+    if (!hpkt)
+        return NULL;
 
-  hpkt->hp_head =
-      malloc(size + VR_HPACKET_HEAD_SPACE + sizeof(struct vr_hpacket_tail));
-  if (!hpkt->hp_head) {
-    free(hpkt);
-    return NULL;
-  }
+    hpkt->hp_head = malloc(size + VR_HPACKET_HEAD_SPACE + sizeof(struct vr_hpacket_tail));
+    if (!hpkt->hp_head) {
+        free(hpkt);
+        return NULL;
+    }
 
-  hpkt->hp_data = hpkt->hp_tail = VR_HPACKET_HEAD_SPACE;
-  hpkt->hp_end = size - 1;
-  hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-  hpkt_tail->hp_users = 1;
-  pkt = &hpkt->hp_packet;
-  pkt->vp_head = hpkt->hp_head;
-  pkt->vp_data = hpkt->hp_data;
-  pkt->vp_end = hpkt->hp_end;
-  pkt->vp_len = 0;
-  pkt->vp_if = NULL;
+    hpkt->hp_data = hpkt->hp_tail = VR_HPACKET_HEAD_SPACE;
+    hpkt->hp_end = size - 1;
+    hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
+    hpkt_tail->hp_users = 1;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_head = hpkt->hp_head;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_end = hpkt->hp_end;
+    pkt->vp_len = 0;
+    pkt->vp_if = NULL;
 
-  return hpkt;
+    return hpkt;
 }
 
 struct vr_hpacket *
 vr_hpacket_clone(struct vr_hpacket *hpkt)
 {
-  struct vr_hpacket *hpkt_c;
-  struct vr_hpacket_tail *hpkt_tail;
+    struct vr_hpacket *hpkt_c;
+    struct vr_hpacket_tail *hpkt_tail;
 
-  hpkt_c = (struct vr_hpacket *)malloc(sizeof(struct vr_hpacket));
-  if (!hpkt_c)
-    return NULL;
+    hpkt_c = (struct vr_hpacket *)malloc(sizeof(struct vr_hpacket));
+    if (!hpkt_c)
+        return NULL;
 
-  memcpy(hpkt_c, hpkt, sizeof(*hpkt));
+    memcpy(hpkt_c, hpkt, sizeof(*hpkt));
 
-  /* increase the reference count for the buffer */
-  hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-  hpkt_tail->hp_users++;
+    /* increase the reference count for the buffer */
+    hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
+    hpkt_tail->hp_users++;
 
-  hpkt_c->hp_flags |= VR_HPACKET_FLAGS_CLONED;
-  return hpkt_c;
+    hpkt_c->hp_flags |= VR_HPACKET_FLAGS_CLONED;
+    return hpkt_c;
 }
 
 struct vr_hpacket *
 vr_hpacket_pool_alloc(struct vr_hpacket_pool *pool)
 {
-  struct vr_hpacket *hpkt;
-  struct vr_packet *pkt;
+    struct vr_hpacket *hpkt;
+    struct vr_packet *pkt;
 
-  hpkt = pool->pool_head;
-  pool->pool_head = hpkt->hp_next;
-  hpkt->hp_next = NULL;
-  pkt = &hpkt->hp_packet;
-  pkt->vp_data = hpkt->hp_data;
-  return hpkt;
+    hpkt = pool->pool_head;
+    pool->pool_head = hpkt->hp_next;
+    hpkt->hp_next = NULL;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_data = hpkt->hp_data;
+    return hpkt;
 }
 
 void
 vr_hpacket_pool_free(struct vr_hpacket *hpkt)
 {
-  struct vr_hpacket_pool *pool = hpkt->hp_pool;
-  struct vr_packet *pkt;
+    struct vr_hpacket_pool *pool = hpkt->hp_pool;
+    struct vr_packet *pkt;
 
-  hpkt->hp_next = pool->pool_head;
-  pool->pool_head = hpkt;
-  pkt = &hpkt->hp_packet;
-  pkt->vp_data = hpkt->hp_data;
-  pkt->vp_len = 0;
-  pkt->vp_if = NULL;
+    hpkt->hp_next = pool->pool_head;
+    pool->pool_head = hpkt;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_len = 0;
+    pkt->vp_if = NULL;
 
-  return;
+    return;
 }
 
 void
 vr_hpacket_pool_destroy(struct vr_hpacket_pool *pool)
 {
-  struct vr_hpacket *hpkt, *n_hpkt;
+    struct vr_hpacket *hpkt, *n_hpkt;
 
-  hpkt = pool->pool_head;
-  while (hpkt) {
-    n_hpkt = hpkt->hp_next;
-    hpkt->hp_next = NULL;
-    hpkt->hp_pool = NULL;
-    vr_hpacket_free(hpkt);
-    hpkt = n_hpkt;
-  }
-  vr_free(pool, VR_HPACKET_POOL_OBJECT);
+    hpkt = pool->pool_head;
+    while (hpkt) {
+        n_hpkt = hpkt->hp_next;
+        hpkt->hp_next = NULL;
+        hpkt->hp_pool = NULL;
+        vr_hpacket_free(hpkt);
+        hpkt = n_hpkt;
+    }
+    vr_free(pool, VR_HPACKET_POOL_OBJECT);
 
-  return;
+    return;
 }
 
 struct vr_hpacket_pool *
 vr_hpacket_pool_create(__u32 pool_size, __u32 psize)
 {
-  __u32 i;
-  struct vr_hpacket_pool *pool;
-  struct vr_hpacket *hpkt;
+    __u32 i;
+    struct vr_hpacket_pool *pool;
+    struct vr_hpacket *hpkt;
 
-  if (!pool_size)
-    return NULL;
+    if (!pool_size)
+        return NULL;
 
-  pool = vr_zalloc(sizeof(*pool), VR_HPACKET_POOL_OBJECT);
-  if (!pool)
-    goto cleanup;
+    pool = vr_zalloc(sizeof(*pool), VR_HPACKET_POOL_OBJECT);
+    if (!pool)
+        goto cleanup;
 
-  for (i = 0; i < pool_size; i++) {
-    hpkt = vr_hpacket_alloc(psize);
-    if (!hpkt)
-      goto cleanup;
+    for (i = 0; i < pool_size; i++) {
+        hpkt = vr_hpacket_alloc(psize);
+        if (!hpkt)
+            goto cleanup;
 
-    if (!pool->pool_head)
-      pool->pool_head = hpkt;
-    else {
-      hpkt->hp_next = pool->pool_head->hp_next;
-      pool->pool_head->hp_next = hpkt;
+        if (!pool->pool_head)
+            pool->pool_head = hpkt;
+        else {
+            hpkt->hp_next = pool->pool_head->hp_next;
+            pool->pool_head->hp_next = hpkt;
+        }
+        hpkt->hp_pool = pool;
     }
-    hpkt->hp_pool = pool;
-  }
 
-  return pool;
+    return pool;
 
 cleanup:
-  if (pool)
-    vr_hpacket_pool_destroy(pool);
+    if (pool)
+        vr_hpacket_pool_destroy(pool);
 
-  return NULL;
+    return NULL;
 }
 
 static struct vr_packet *
 vr_lib_palloc(__u32 size)
 {
-  struct vr_hpacket *hpkt;
+    struct vr_hpacket *hpkt;
 
-  hpkt = vr_hpacket_alloc(size);
-  if (!hpkt)
-    return NULL;
+    hpkt = vr_hpacket_alloc(size);
+    if (!hpkt)
+        return NULL;
 
-  return vr_lib_get_packet(hpkt, NULL);
+    return vr_lib_get_packet(hpkt, NULL);
 }
 
 static struct vr_packet *
 vr_lib_palloc_head(struct vr_packet *pkt, __u32 size)
 {
-  struct vr_hpacket *hpkt_head, *hpkt;
+    struct vr_hpacket *hpkt_head, *hpkt;
 
-  hpkt_head = vr_hpacket_alloc(size);
-  if (!hpkt_head)
-    return NULL;
+    hpkt_head = vr_hpacket_alloc(size);
+    if (!hpkt_head)
+        return NULL;
 
-  hpkt = VR_PACKET_TO_HPACKET(pkt);
-  hpkt_head->hp_len = hpkt->hp_len;
-  hpkt_head->hp_next = hpkt;
+    hpkt = VR_PACKET_TO_HPACKET(pkt);
+    hpkt_head->hp_len = hpkt->hp_len;
+    hpkt_head->hp_next = hpkt;
 
-  return &hpkt_head->hp_packet;
+    return &hpkt_head->hp_packet;
 }
 
 static inline void
 vr_lib_pfree(struct vr_packet *pkt, uint16_t reason)
 {
-  if (!pkt)
-    return;
+    if (!pkt)
+        return;
 
-  afxdp_pkt_recycle(pkt);
+    afxdp_pkt_recycle(pkt);
 }
 
 static int
-vr_lib_pcopy(unsigned char *dst,
-             struct vr_packet *p_src,
-             __u32 offset,
-             __u32 len)
+vr_lib_pcopy(unsigned char *dst, struct vr_packet *p_src, __u32 offset, __u32 len)
 {
-  struct vr_hpacket *src_hpkt = VR_PACKET_TO_HPACKET(p_src);
+    struct vr_hpacket *src_hpkt = VR_PACKET_TO_HPACKET(p_src);
 
-  return vr_hpacket_copy(dst, src_hpkt, offset, len);
+    return vr_hpacket_copy(dst, src_hpkt, offset, len);
 }
 
 static __u16
 vr_lib_pfrag_len(struct vr_packet *pkt)
 {
-  struct vr_hpacket *hpkt;
+    struct vr_hpacket *hpkt;
 
-  hpkt = VR_PACKET_TO_HPACKET(pkt);
-  if (!hpkt->hp_next)
-    return 0;
+    hpkt = VR_PACKET_TO_HPACKET(pkt);
+    if (!hpkt->hp_next)
+        return 0;
 
-  return hpkt->hp_next->hp_len;
+    return hpkt->hp_next->hp_len;
 }
 
 static void
 vr_lib_get_time(uint64_t *sec, uint64_t *usec)
 {
-  struct timeval tv;
+    struct timeval tv;
 
-  *sec = *usec = 0;
-  if (gettimeofday(&tv, NULL) < 0)
+    *sec = *usec = 0;
+    if (gettimeofday(&tv, NULL) < 0)
+        return;
+
+    *sec = tv.tv_sec;
+    *usec = tv.tv_usec;
+
     return;
-
-  *sec = tv.tv_sec;
-  *usec = tv.tv_usec;
-
-  return;
 }
 
 static struct vr_packet *
 vr_lib_pclone(struct vr_packet *pkt)
 {
-  struct vr_hpacket *hpkt, *hpkt_c;
+    struct vr_hpacket *hpkt, *hpkt_c;
 
-  hpkt = VR_PACKET_TO_HPACKET(pkt);
-  hpkt_c = vr_hpacket_clone(hpkt);
-  if (!hpkt_c)
-    return NULL;
+    hpkt = VR_PACKET_TO_HPACKET(pkt);
+    hpkt_c = vr_hpacket_clone(hpkt);
+    if (!hpkt_c)
+        return NULL;
 
-  return &hpkt_c->hp_packet;
+    return &hpkt_c->hp_packet;
 }
 
 static void
 vr_lib_preset(struct vr_packet *pkt)
 {
-  struct vr_hpacket *hpkt;
+    struct vr_hpacket *hpkt;
 
-  hpkt = VR_PACKET_TO_HPACKET(pkt);
+    hpkt = VR_PACKET_TO_HPACKET(pkt);
 
-  pkt->vp_data = hpkt->hp_data;
-  pkt->vp_tail = hpkt->hp_tail;
-  pkt->vp_len = pkt->vp_tail - pkt->vp_data + 1;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_tail = hpkt->hp_tail;
+    pkt->vp_len = pkt->vp_tail - pkt->vp_data + 1;
 
-  return;
+    return;
 }
 
 static __u32
 vr_lib_get_cpu(void)
 {
-  return 0;
-}
-
-static int
-vr_lib_schedule_work(__u32 cpu, void (*fn)(void *), void *arg)
-{
-  return -EOPNOTSUPP;
+    return 0;
 }
 
 static void
 vr_lib_delay_op(void)
 {
-  return;
+    return;
+}
+
+static void
+vr_lib_rcu_cb(struct rcu_head *rh)
+{
+    struct vr_afxdp_rcu_cb_data *cb_data;
+    struct vr_defer_data *defer;
+    struct vr_flow_queue *vfq;
+    struct vr_packet_node *pnode;
+
+    cb_data = CONTAINER_OF(rcd_rcu, struct vr_afxdp_rcu_cb_data, rh);
+
+    if ((cb_data->rcd_user_cb == vr_flow_defer_cb)) {
+        defer = (struct vr_defer_data *)cb_data->rcd_user_data;
+        vfq = ((struct vr_flow_defer_data *)defer->vdd_data)->vfdd_flow_queue;
+        if (vfq) {
+            for (__s32 i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
+                pnode = &vfq->vfq_pnodes[i];
+                if (pnode->pl_packet)
+                    // TODO: send a packet to pkt
+                    return;
+            }
+        }
+    }
+
+    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
+    vr_free(cb_data, VR_DEFER_OBJECT);
+}
+
+static void
+vr_lib_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
+{
+    struct vr_afxdp_rcu_cb_data *cb_data;
+
+    cb_data = CONTAINER_OF(rcd_user_data, struct vr_afxdp_rcu_cb_data, data);
+    cb_data->rcd_user_cb = user_cb;
+    cb_data->rcd_router = router;
+    call_rcu(&cb_data->rcd_rcu, vr_lib_rcu_cb);
+}
+
+static void
+vr_lib_htable_work_cb(struct vrouter *router __attribute__((unused)), void *arg)
+{
+    struct vr_afxdp_work_cb_data *defer = (struct vr_afxdp_work_cb_data *)arg;
+    defer->dwc_fn(defer->dwc_data);
+}
+
+// work callback called on nl thread.
+static int
+vr_lib_schedule_work(__u32 cpu, void (*fn)(void *), void *arg)
+{
+    struct vr_afxdp_work_cb_data *defer;
+
+    if (!fn)
+        return -1;
+
+    if (fn == vr_htable_hentry_scheduled_delete) {
+        defer = vr_get_defer_data(sizeof(*defer));
+        if (!defer)
+            return -1;
+
+        defer->dwc_fn = fn;
+        defer->dwc_data = arg;
+        vr_defer(NULL, vr_lib_htable_work_cb, defer);
+
+        return 0;
+    }
+
+    fn(arg);
+
+    return 0;
 }
 
 static void *
 vr_lib_page_alloc(__u32 size)
 {
-  int pages;
+    int pages;
 
-  pages = size / PAGE_SIZE;
-  if (size % PAGE_SIZE)
-    pages++;
+    pages = size / PAGE_SIZE;
+    if (size % PAGE_SIZE)
+        pages++;
 
-  return calloc(pages, PAGE_SIZE);
+    return calloc(pages, PAGE_SIZE);
 }
 
 static void
 vr_lib_page_free(void *address, __u32 size)
 {
-  if (address)
-    free(address);
+    if (address)
+        free(address);
 }
 
 static int
 vr_lib_create_timer(struct vr_timer *vtimer)
 {
-  struct dummy_timer_list *timer;
+    struct dummy_timer_list *timer;
 
-  timer = vr_zalloc(sizeof(*timer), VR_TIMER_OBJECT);
-  if (!timer)
-    return -1;
-  init_timer(timer);
+    timer = vr_zalloc(sizeof(*timer), VR_TIMER_OBJECT);
+    if (!timer)
+        return -1;
+    init_timer(timer);
 
-  vtimer->vt_os_arg = (void *)timer;
-  timer->data = (uint64_t)vtimer;
-  timer->function = ulinux_timer;
-  timer->expires = get_time() + vtimer->vt_msecs;
-  add_timer(timer);
+    vtimer->vt_os_arg = (void *)timer;
+    timer->data = (uint64_t)vtimer;
+    timer->function = ulinux_timer;
+    timer->expires = get_time() + vtimer->vt_msecs;
+    add_timer(timer);
 
-  return 0;
+    return 0;
 }
 
 static void
 vr_lib_delete_timer(struct vr_timer *vtimer)
 {
-  vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
+    vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
 }
 
 static void *
 afxdp_network_header(struct vr_packet *pkt)
 {
-  if (pkt->vp_network_h < pkt->vp_end)
-    return pkt->vp_head + pkt->vp_network_h;
+    if (pkt->vp_network_h < pkt->vp_end)
+        return pkt->vp_head + pkt->vp_network_h;
 
-  return NULL;
+    return NULL;
 }
 
 static void *
 afxdp_inner_network_header(struct vr_packet *pkt)
 {
-  /* TODO: not used? */
-  fprintf(stderr, "%s: not implemented\n", __func__);
+    /* TODO: not used? */
+    fprintf(stderr, "%s: not implemented\n", __func__);
 
-  return NULL;
+    return NULL;
 }
 
 static void *
 afxdp_data_at_offset(struct vr_packet *pkt, __u16 off)
 {
-  if (off < pkt->vp_end)
-    return pkt->vp_head + off;
+    if (off < pkt->vp_end)
+        return pkt->vp_head + off;
 
-  /* TODO: for buffer chain? */
-  fprintf(stderr, "%s: buffer chain not supported\n", __func__);
+    /* TODO: for buffer chain? */
+    fprintf(stderr, "%s: buffer chain not supported\n", __func__);
 
-  return NULL;
+    return NULL;
 }
 
 // return pointer to data at pkt->vp_data offset if hdr_len bytes
@@ -517,205 +584,203 @@ afxdp_data_at_offset(struct vr_packet *pkt, __u16 off)
 static void *
 afxdp_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 {
-  int pkt_len = pkt->vp_tail - pkt->vp_data;
-  if (hdr_len <= pkt_len) {
-    return (void *)((uintptr_t)pkt->vp_head + pkt->vp_data);
-  } else {
-    if (pkt_len <= 0)
-      return NULL;
+    int pkt_len = pkt->vp_tail - pkt->vp_data;
+    if (hdr_len <= pkt_len) {
+        return (void *)((uintptr_t)pkt->vp_head + pkt->vp_data);
+    } else {
+        if (pkt_len <= 0)
+            return NULL;
 
-    memcpy(buf, (__u8 *)pkt->vp_head + pkt->vp_data, pkt_len);
-    hdr_len -= pkt_len;
+        memcpy(buf, (__u8 *)pkt->vp_head + pkt->vp_data, pkt_len);
+        hdr_len -= pkt_len;
 
-    if (hdr_len > 0)
-      return NULL;
+        if (hdr_len > 0)
+            return NULL;
 
-    return buf;
-  }
+        return buf;
+    }
 }
 
 // copy packet buf
 static int
 afxdp_pcow(struct vr_packet **pktp, unsigned short head_room)
 {
-  return 0;
+    return 0;
 }
 
 // adjusting TCP MSS
 void
 afxdp_adjust_tcp_mss(struct tcphdr *tcph, __u16 overlay_len, __u8 iph_len)
 {
-  int opt_off = sizeof(struct tcphdr);
-  __u8 port_id;
-  __u8 *opt_ptr = (__u8 *)tcph;
-  __u16 pkt_mss, max_mss, mtu;
-  __u32 csum;
+    int opt_off = sizeof(struct tcphdr);
+    __u8 port_id;
+    __u8 *opt_ptr = (__u8 *)tcph;
+    __u16 pkt_mss, max_mss, mtu;
+    __u32 csum;
 
-  struct vrouter *router = vrouter_get(0);
+    struct vrouter *router = vrouter_get(0);
 
-  if ((tcph == NULL) || !(tcph->syn) || (router == NULL))
-    return;
-
-  if (router->vr_eth_if[0] == NULL)
-    return;
-
-  while (opt_off < (tcph->doff * 4)) {
-    switch (opt_ptr[opt_off]) {
-    case TCPOPT_EOL:
-      return;
-
-    case TCPOPT_NOP:
-      opt_off++;
-      continue;
-
-    case TCPOPT_MAXSEG:
-      if ((opt_off + TCPOLEN_MAXSEG) > (tcph->doff * 4))
+    if ((tcph == NULL) || !(tcph->syn) || (router == NULL))
         return;
 
-      if (opt_ptr[opt_off + 1] != TCPOLEN_MAXSEG)
+    if (router->vr_eth_if[0] == NULL)
         return;
 
-      pkt_mss = (opt_ptr[opt_off + 2] << 8 | opt_ptr[opt_off + 3]);
-      if (router->vr_eth_if[0] == NULL)
-        return;
+    while (opt_off < (tcph->doff * 4)) {
+        switch (opt_ptr[opt_off]) {
+        case TCPOPT_EOL:
+            return;
 
-      port_id = (((struct vr_afxdp_ethdev *)(router->vr_eth_if[0]->vif_os))
-                     ->os_ifidx);
-      mtu = get_mtu_by_ifindex(port_id);
-      max_mss = mtu - (overlay_len + iph_len + sizeof(struct tcphdr));
-      if (pkt_mss > max_mss) {
-        opt_ptr[opt_off + 2] = (max_mss & 0xff00) >> 8;
-        opt_ptr[opt_off + 3] = max_mss & 0xff;
-        csum = (__u16)(~cpu_to_be_16(tcph->check));
-        csum = csum + (__u16)~pkt_mss;
-        csum = (csum & 0xffff) + (csum >> 16);
-        csum += max_mss;
-        csum = (csum & 0xffff) + (csum >> 16);
-        tcph->check = cpu_to_be_16(~((__u16)csum));
-      }
-      return;
+        case TCPOPT_NOP:
+            opt_off++;
+            continue;
 
-    default:
-      if ((opt_off + 1) == (tcph->doff * 4))
-        return;
-      if (opt_ptr[opt_off + 1])
-        opt_off += opt_ptr[opt_off + 1];
-      else
-        opt_off++;
-      continue;
+        case TCPOPT_MAXSEG:
+            if ((opt_off + TCPOLEN_MAXSEG) > (tcph->doff * 4))
+                return;
+
+            if (opt_ptr[opt_off + 1] != TCPOLEN_MAXSEG)
+                return;
+
+            pkt_mss = (opt_ptr[opt_off + 2] << 8 | opt_ptr[opt_off + 3]);
+            if (router->vr_eth_if[0] == NULL)
+                return;
+
+            port_id = (((struct vr_afxdp_ethdev *)(router->vr_eth_if[0]->vif_os))->os_ifidx);
+            mtu = get_mtu_by_ifindex(port_id);
+            max_mss = mtu - (overlay_len + iph_len + sizeof(struct tcphdr));
+            if (pkt_mss > max_mss) {
+                opt_ptr[opt_off + 2] = (max_mss & 0xff00) >> 8;
+                opt_ptr[opt_off + 3] = max_mss & 0xff;
+                csum = (__u16)(~cpu_to_be_16(tcph->check));
+                csum = csum + (__u16)~pkt_mss;
+                csum = (csum & 0xffff) + (csum >> 16);
+                csum += max_mss;
+                csum = (csum & 0xffff) + (csum >> 16);
+                tcph->check = cpu_to_be_16(~((__u16)csum));
+            }
+            return;
+
+        default:
+            if ((opt_off + 1) == (tcph->doff * 4))
+                return;
+            if (opt_ptr[opt_off + 1])
+                opt_off += opt_ptr[opt_off + 1];
+            else
+                opt_off++;
+            continue;
+        }
     }
-  }
 
-  return;
+    return;
 }
 
 static int
 afxdp_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, __u16 overlay_len)
 {
-  struct vr_ip *ip4h = NULL;
-  struct vr_ip6 *ip6h = NULL;
-  struct tcphdr *tcph;
-  __s32 offset;
-  __u8 iph_len = 0, iph_proto = 0;
+    struct vr_ip *ip4h = NULL;
+    struct vr_ip6 *ip6h = NULL;
+    struct tcphdr *tcph;
+    __s32 offset;
+    __u8 iph_len = 0, iph_proto = 0;
 
-  // check if whole ip header is in the packet
-  if (pkt->vp_type == VP_TYPE_IP) {
-    offset = sizeof(struct vr_ip);
-    if (pkt->vp_data + offset < pkt->vp_end)
-      ip4h = (struct vr_ip *)((uintptr_t)pkt->vp_head + pkt->vp_data);
-    else {
-      fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
-      return -1;
+    // check if whole ip header is in the packet
+    if (pkt->vp_type == VP_TYPE_IP) {
+        offset = sizeof(struct vr_ip);
+        if (pkt->vp_data + offset < pkt->vp_end)
+            ip4h = (struct vr_ip *)((uintptr_t)pkt->vp_head + pkt->vp_data);
+        else {
+            fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
+            return -1;
+        }
+
+        iph_proto = ip4h->ip_proto;
+        iph_len = ip4h->ip_hl * 4;
+
+        // if this is a fragment and not the first one, it can be ignored
+        if (ip4h->ip_frag_off & cpu_to_be_16(IP_OFFMASK))
+            goto out;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        iph_len = offset = sizeof(struct vr_ip6);
+        if (pkt->vp_data + offset < pkt->vp_end)
+            ip6h = (struct vr_ip6 *)((uintptr_t)pkt->vp_head + pkt->vp_data);
+        else {
+            fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
+            return -1;
+        }
+        iph_proto = ip6h->ip6_nxt;
     }
 
-    iph_proto = ip4h->ip_proto;
-    iph_len = ip4h->ip_hl * 4;
+    if (iph_proto != VR_IP_PROTO_TCP)
+        goto out;
 
-    // if this is a fragment and not the first one, it can be ignored
-    if (ip4h->ip_frag_off & cpu_to_be_16(IP_OFFMASK))
-      goto out;
-  } else if (pkt->vp_type == VP_TYPE_IP6) {
-    iph_len = offset = sizeof(struct vr_ip6);
+    // check if whole tcp header is also in the packet
+    offset = iph_len + sizeof(struct tcphdr);
     if (pkt->vp_data + offset < pkt->vp_end)
-      ip6h = (struct vr_ip6 *)((uintptr_t)pkt->vp_head + pkt->vp_data);
+        tcph = (struct tcphdr *)pkt_data_at_offset(pkt, pkt->vp_data + iph_len);
     else {
-      fprintf(stderr, "%s: ip header not in first buffer\n", __func__);
-      return -1;
+        fprintf(stderr, "%s: tcp header not in first buffer\n", __func__);
+        return -1;
     }
-    iph_proto = ip6h->ip6_nxt;
-  }
 
-  if (iph_proto != VR_IP_PROTO_TCP)
-    goto out;
+    if ((tcph->doff << 2) <= (sizeof(struct tcphdr)))
+        goto out;
 
-  // check if whole tcp header is also in the packet
-  offset = iph_len + sizeof(struct tcphdr);
-  if (pkt->vp_data + offset < pkt->vp_end)
-    tcph = (struct tcphdr *)pkt_data_at_offset(pkt, pkt->vp_data + iph_len);
-  else {
-    fprintf(stderr, "%s: tcp header not in first buffer\n", __func__);
-    return -1;
-  }
-
-  if ((tcph->doff << 2) <= (sizeof(struct tcphdr)))
-    goto out;
-
-  offset += (tcph->doff << 2) - sizeof(struct tcphdr);
-  if (pkt->vp_data + offset > pkt->vp_end) {
-    fprintf(stderr, "%s: tcp header outside first buffer\n", __func__);
-    return -1;
-  }
-  afxdp_adjust_tcp_mss(tcph, overlay_len, iph_len);
+    offset += (tcph->doff << 2) - sizeof(struct tcphdr);
+    if (pkt->vp_data + offset > pkt->vp_end) {
+        fprintf(stderr, "%s: tcp header outside first buffer\n", __func__);
+        return -1;
+    }
+    afxdp_adjust_tcp_mss(tcph, overlay_len, iph_len);
 
 out:
-  return 0;
+    return 0;
 }
 
 static __u32
 afxdp_pgso_size(struct vr_packet *pkt)
 {
-  struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
-  return buf->tso_segsz;
+    struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
+    return buf->tso_segsz;
 }
 
 static __s32
 afxdp_pkt_may_pull(struct vr_packet *pkt, __u32 len)
 {
-  struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
-  if (len > buf->data_len)
-    return -1;
+    struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
+    if (len > buf->data_len)
+        return -1;
 
-  vr_afxdp_buf_reset(pkt);
-  return 0;
+    vr_afxdp_buf_reset(pkt);
+    return 0;
 }
 
 static int
 afxdp_is_frag_limit_exceeded(void)
 {
-  struct vrouter *router = vrouter_get(0);
-  struct vr_malloc_stats *stats;
-  uint64_t sum = 0;
-  unsigned int cpu;
+    struct vrouter *router = vrouter_get(0);
+    struct vr_malloc_stats *stats;
+    uint64_t sum = 0;
+    unsigned int cpu;
 
-  if (router->vr_malloc_stats) {
-    for (cpu = 0; cpu < vr_num_cpus; cpu++) {
-      if (router->vr_malloc_stats[cpu]) {
-        stats = &router->vr_malloc_stats[cpu][VR_FRAGMENT_QUEUE_ELEMENT_OBJECT];
-        sum += stats->ms_alloc;
-        sum -= stats->ms_free;
-      }
+    if (router->vr_malloc_stats) {
+        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+            if (router->vr_malloc_stats[cpu]) {
+                stats = &router->vr_malloc_stats[cpu][VR_FRAGMENT_QUEUE_ELEMENT_OBJECT];
+                sum += stats->ms_alloc;
+                sum -= stats->ms_free;
+            }
+        }
+
+        if (sum > VR_AFXDP_MAX_FRAGMENT_ELEMENTS)
+            return 1;
     }
 
-    if (sum > VR_AFXDP_MAX_FRAGMENT_ELEMENTS)
-      return 1;
-  }
-
-  return 0;
+    return 0;
 }
 
 static void
-afxdp_register_nic(struct vr_interface *vif __attribute__((unused)),
-                   vr_interface_req *vifr __attribute__((unused)))
+afxdp_register_nic(struct vr_interface *vif __attribute__((unused)), vr_interface_req *vifr __attribute__((unused)))
 {
 }
 
@@ -736,6 +801,7 @@ struct host_os vr_lib_host = {
     .hos_get_cpu = vr_lib_get_cpu,
     .hos_schedule_work = vr_lib_schedule_work,
     .hos_delay_op = vr_lib_delay_op,
+    .hos_defer = vr_lib_defer,
     .hos_get_time = vr_lib_get_time,
     .hos_page_alloc = vr_lib_page_alloc,
     .hos_page_free = vr_lib_page_free,
@@ -759,7 +825,7 @@ struct host_os vr_lib_host = {
 struct host_os *
 vrouter_get_host(void)
 {
-  return &vr_lib_host;
+    return &vr_lib_host;
 }
 
 static uint64_t prng_state = 0;
@@ -768,57 +834,57 @@ static int prng_inited = 0;
 static inline uint64_t
 xorshift64(void)
 {
-  uint64_t x = prng_state;
-  x ^= x >> 12;
-  x ^= x << 25;
-  x ^= x >> 27;
-  prng_state = x;
-  return x * 2685821657736338717ULL;
+    uint64_t x = prng_state;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    prng_state = x;
+    return x * 2685821657736338717ULL;
 }
 
 static void
 seed_random(void)
 {
-  if (prng_inited) {
-    return;
-  }
-  prng_inited = 1;
+    if (prng_inited) {
+        return;
+    }
+    prng_inited = 1;
 
-  /*
-   * Below is a trivial seeding example from current time.
-   * If you want better unpredictability, read from /dev/urandom here (once).
-   */
-  prng_state = (uint64_t)time(NULL);
-  (void)xorshift64();
+    /*
+     * Below is a trivial seeding example from current time.
+     * If you want better unpredictability, read from /dev/urandom here (once).
+     */
+    prng_state = (uint64_t)time(NULL);
+    (void)xorshift64();
 }
 
 void
 get_random_bytes(void *buf, int nbytes)
 {
-  int offset = 0;
+    int offset = 0;
 
-  if (!prng_inited) {
-    seed_random();
-  }
-
-  while (offset < nbytes) {
-    uint64_t rnd = xorshift64();
-
-    int chunk = nbytes - offset;
-    if (chunk >= 8) {
-      memcpy((uint8_t *)buf + offset, &rnd, 8);
-      offset += 8;
-    } else {
-      memcpy((uint8_t *)buf + offset, &rnd, chunk);
-      offset += chunk;
+    if (!prng_inited) {
+        seed_random();
     }
-  }
+
+    while (offset < nbytes) {
+        uint64_t rnd = xorshift64();
+
+        int chunk = nbytes - offset;
+        if (chunk >= 8) {
+            memcpy((uint8_t *)buf + offset, &rnd, 8);
+            offset += 8;
+        } else {
+            memcpy((uint8_t *)buf + offset, &rnd, chunk);
+            offset += chunk;
+        }
+    }
 }
 
 struct afxdp_meta *
 vr_afxdp_pkt_to_afxdp_meta(struct vr_packet *pkt)
 {
-  return (struct afxdp_meta *)((uintptr_t)pkt - sizeof(struct afxdp_meta));
+    return (struct afxdp_meta *)((uintptr_t)pkt - sizeof(struct afxdp_meta));
 }
 
 //  vr_afxdp_pkt_to_xdp_buf - Convert a pointer to vr_packet into the associated
@@ -826,8 +892,8 @@ vr_afxdp_pkt_to_afxdp_meta(struct vr_packet *pkt)
 struct vr_xdp_buf *
 vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt)
 {
-  /* Assumes that 'struct vr_packet' is placed immediately after vr_xdp_buf */
-  return (struct vr_xdp_buf *)((uintptr_t)pkt - sizeof(struct vr_xdp_buf));
+    /* Assumes that 'struct vr_packet' is placed immediately after vr_xdp_buf */
+    return (struct vr_xdp_buf *)((uintptr_t)pkt - sizeof(struct vr_xdp_buf));
 }
 
 // vr_afxdp_xdp_buf_to_pkt - Convert a pointer to vr_xdp_buf into the associated
@@ -835,13 +901,13 @@ vr_afxdp_pkt_to_xdp_buf(struct vr_packet *pkt)
 struct vr_packet *
 vr_afxdp_xdp_buf_to_pkt(struct vr_xdp_buf *xdp_buf)
 {
-  return (struct vr_packet *)((uintptr_t)xdp_buf + sizeof(struct vr_xdp_buf));
+    return (struct vr_packet *)((uintptr_t)xdp_buf + sizeof(struct vr_xdp_buf));
 }
 
 struct vr_xpacket *
 afxdp_xpacket_from_pkt(struct vr_packet *pkt)
 {
-  return CONTAINER_OF(pkt, struct vr_xpacket, pkt);
+    return CONTAINER_OF(pkt, struct vr_xpacket, pkt);
 }
 
 // fxdp_xdp_buf_copy - Copy the given vr_xdp_buf (including metadata) from the
@@ -849,50 +915,46 @@ afxdp_xpacket_from_pkt(struct vr_packet *pkt)
 struct vr_xdp_buf *
 afxdp_xdp_buf_copy(struct vr_xdp_buf *src, void *pool)
 {
-  struct vr_xdp_buf *dst = malloc(sizeof(struct vr_xdp_buf));
-  if (!dst)
-    return NULL;
-  memcpy(dst, src, sizeof(struct vr_xdp_buf));
-  return dst;
+    struct vr_xdp_buf *dst = malloc(sizeof(struct vr_xdp_buf));
+    if (!dst)
+        return NULL;
+    memcpy(dst, src, sizeof(struct vr_xdp_buf));
+    return dst;
 }
 
 // afxdp_xdp_buf_free - Free the given vr_xdp_buf.
 void
 afxdp_xdp_buf_free(struct vr_xdp_buf *xdp_buf)
 {
-  free(xdp_buf);
+    free(xdp_buf);
 }
 
 // calcurate frame index by shifting
 __u32
 afxdp_desc_to_index(uint64_t addr)
 {
-  return (__u32)(addr >> FRAME_SHIFT);
+    return (__u32)(addr >> FRAME_SHIFT);
 }
 
 void
-vr_afxdp_packet_init(struct vr_xdp_buf *xbuf,
-                     void *frame_ptr,
-                     __u16 frame_size,
-                     __u16 pkt_len,
-                     __u64 desc_addr)
+vr_afxdp_packet_init(struct vr_xdp_buf *xbuf, void *frame_ptr, __u16 frame_size, __u16 pkt_len, __u64 desc_addr)
 {
-  xbuf->buf_addr = frame_ptr;
-  xbuf->buf_len = frame_size;
-  xbuf->data_len = pkt_len;
-  xbuf->desc_addr = desc_addr;
-  xbuf->data_off = AFXDP_PKT_HEADROOM;
+    xbuf->buf_addr = frame_ptr;
+    xbuf->buf_len = frame_size;
+    xbuf->data_len = pkt_len;
+    xbuf->desc_addr = desc_addr;
+    xbuf->data_off = AFXDP_PKT_HEADROOM;
 
-  struct vr_packet *pkt = vr_afxdp_xdp_buf_to_pkt(xbuf);
-  memset(pkt, 0, sizeof(struct vr_packet));
+    struct vr_packet *pkt = vr_afxdp_xdp_buf_to_pkt(xbuf);
+    memset(pkt, 0, sizeof(struct vr_packet));
 
-  pkt->vp_head = (unsigned char *)frame_ptr;
-  pkt->vp_data = xbuf->data_off;
-  pkt->vp_tail = xbuf->data_off + pkt_len;
-  pkt->vp_end = frame_size;
+    pkt->vp_head = (unsigned char *)frame_ptr;
+    pkt->vp_data = xbuf->data_off;
+    pkt->vp_tail = xbuf->data_off + pkt_len;
+    pkt->vp_end = frame_size;
 
-  pkt->vp_cpu = vr_get_cpu();
-  pkt->vp_if = NULL;
+    pkt->vp_cpu = vr_get_cpu();
+    pkt->vp_if = NULL;
 }
 
 struct vr_packet *
@@ -902,56 +964,56 @@ vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
                     char *data,
                     __u32 queue_id)
 {
-  struct vr_packet *pkt;
+    struct vr_packet *pkt;
 
-  __u32 len = desc->len;
-  __u32 headroom = AFXDP_PKT_HEADROOM;
+    __u32 len = desc->len;
+    __u32 headroom = AFXDP_PKT_HEADROOM;
 
-  struct afxdp_meta *m = (struct afxdp_meta *)(data - headroom);
-  m->umem_addr = desc->addr;
-  m->len = desc->len;
-  m->xsk = xsk;
+    struct afxdp_meta *m = (struct afxdp_meta *)(data - headroom);
+    m->umem_addr = desc->addr;
+    m->len = desc->len;
+    m->xsk = xsk;
 
-  pkt = (struct vr_packet *)(m + 1);
-  pkt->vp_head = (unsigned char *)(data - headroom);
-  pkt->vp_data = headroom;
-  pkt->vp_tail = headroom + len;
-  pkt->vp_len = len;
-  pkt->vp_end = FRAME_SIZE;
-  pkt->vp_cpu = sched_getcpu();
-  pkt->vp_if = vif;
-  pkt->vp_queue = queue_id;
-  pkt->vp_network_h = pkt->vp_inner_network_h = 0;
-  pkt->vp_nh = NULL;
-  pkt->vp_flags = 0;
-  pkt->vp_ttl = 64;
-  pkt->vp_type = VP_TYPE_NULL;
-  pkt->vp_queue = queue_id;
-  pkt->vp_priority = VP_PRIORITY_INVALID;
-  pkt->vp_rx_pass = 0;
+    pkt = (struct vr_packet *)(m + 1);
+    pkt->vp_head = (unsigned char *)(data - headroom);
+    pkt->vp_data = headroom;
+    pkt->vp_tail = headroom + len;
+    pkt->vp_len = len;
+    pkt->vp_end = FRAME_SIZE;
+    pkt->vp_cpu = sched_getcpu();
+    pkt->vp_if = vif;
+    pkt->vp_queue = queue_id;
+    pkt->vp_network_h = pkt->vp_inner_network_h = 0;
+    pkt->vp_nh = NULL;
+    pkt->vp_flags = 0;
+    pkt->vp_ttl = 64;
+    pkt->vp_type = VP_TYPE_NULL;
+    pkt->vp_queue = queue_id;
+    pkt->vp_priority = VP_PRIORITY_INVALID;
+    pkt->vp_rx_pass = 0;
 
-  return pkt;
+    return pkt;
 }
 
 void
 vr_afxdp_buf_reset(struct vr_packet *pkt)
 {
-  struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
+    struct vr_xdp_buf *buf = vr_afxdp_pkt_to_xdp_buf(pkt);
 
-  pkt->vp_head = buf->buf_addr;
-  pkt->vp_tail = buf->data_off + buf->data_len;
-  pkt->vp_end = buf->buf_len;
-  pkt->vp_len = pkt->vp_tail - pkt->vp_data;
+    pkt->vp_head = buf->buf_addr;
+    pkt->vp_tail = buf->data_off + buf->data_len;
+    pkt->vp_end = buf->buf_len;
+    pkt->vp_len = pkt->vp_tail - pkt->vp_data;
 
-  return;
+    return;
 }
 
 __u16
 cpu_to_be_16(__u16 x)
 {
 #if defined(__GNUC__)
-  return __builtin_bswap16(x);
+    return __builtin_bswap16(x);
 #else
-  return (uint16_t)(((x & 0x00FFU) << 8) | ((x & 0xFF00U) >> 8));
+    return (uint16_t)(((x & 0x00FFU) << 8) | ((x & 0xFF00U) >> 8));
 #endif
 }
