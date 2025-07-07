@@ -444,7 +444,7 @@ vr_lib_rcu_cb(struct rcu_head *rh)
 
     cb_data = CONTAINER_OF(rcd_rcu, struct vr_afxdp_rcu_cb_data, rh);
 
-    if ((cb_data->rcd_user_cb == vr_flow_defer_cb)) {
+    if (cb_data->rcd_user_cb == vr_flow_defer_cb) {
         defer = (struct vr_defer_data *)cb_data->rcd_user_data;
         vfq = ((struct vr_flow_defer_data *)defer->vdd_data)->vfdd_flow_queue;
         if (vfq) {
