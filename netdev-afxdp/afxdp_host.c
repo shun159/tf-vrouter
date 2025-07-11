@@ -155,34 +155,7 @@ vr_hpacket_copy(unsigned char *dst, struct vr_hpacket *hpkt_src, __u32 offset, _
 void
 vr_hpacket_free(struct vr_hpacket *hpkt)
 {
-    struct vr_hpacket_tail *hpkt_tail;
-    struct vr_hpacket *hpkt_next;
-
-    while (hpkt) {
-        hpkt_next = hpkt->hp_next;
-        hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-        hpkt_tail->hp_users--;
-        if (hpkt->hp_flags & VR_HPACKET_FLAGS_CLONED) {
-            if (!hpkt_tail->hp_users)
-                free(hpkt->hp_head);
-            free(hpkt);
-            return;
-        }
-
-        if (hpkt->hp_pool) {
-            if (hpkt_tail->hp_users) {
-                hpkt->hp_head = malloc(hpkt->hp_end + sizeof(struct vr_hpacket_tail));
-                hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-                hpkt_tail->hp_users = 1;
-            }
-            vr_hpacket_pool_free(hpkt);
-        } else {
-            free(hpkt->hp_head);
-            free(hpkt);
-        }
-
-        hpkt = hpkt_next;
-    }
+    free(hpkt);
 
     return;
 }
@@ -190,32 +163,37 @@ vr_hpacket_free(struct vr_hpacket *hpkt)
 struct vr_hpacket *
 vr_hpacket_alloc(__u32 size)
 {
-    struct vr_hpacket *hpkt;
-    struct vr_hpacket_tail *hpkt_tail;
-    struct vr_packet *pkt;
+    const __u32 headroom = VR_HPACKET_HEAD_SPACE;
+    const __u32 tail_sz = sizeof(struct vr_hpacket_tail);
+    const __u32 meta_sz = sizeof(struct afxdp_meta);
+    const __u32 hph_sz = sizeof(struct vr_hpacket);
 
-    hpkt = (struct vr_hpacket *)malloc(sizeof(*hpkt));
-    if (!hpkt)
+    __u32 alloc_len = hph_sz + meta_sz + headroom + size + tail_sz;
+
+    uint8_t *base = calloc(1, alloc_len);
+    if (!base)
         return NULL;
 
-    hpkt->hp_head = malloc(size + VR_HPACKET_HEAD_SPACE + sizeof(struct vr_hpacket_tail));
-    if (!hpkt->hp_head) {
-        free(hpkt);
-        return NULL;
-    }
+    struct vr_hpacket *hp = (void *)base;
+    __u8 *buf = base + hph_sz + meta_sz; /* vp_head */
 
-    hpkt->hp_data = hpkt->hp_tail = VR_HPACKET_HEAD_SPACE;
-    hpkt->hp_end = size - 1;
-    hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-    hpkt_tail->hp_users = 1;
-    pkt = &hpkt->hp_packet;
-    pkt->vp_head = hpkt->hp_head;
-    pkt->vp_data = hpkt->hp_data;
-    pkt->vp_end = hpkt->hp_end;
-    pkt->vp_len = 0;
-    pkt->vp_if = NULL;
+    hp->hp_head = buf;
+    hp->hp_len = size;
+    hp->hp_data = headroom;
+    hp->hp_tail = headroom + size;
+    hp->hp_end = headroom + size + tail_sz;
 
-    return hpkt;
+    struct vr_hpacket_tail *tail = (void *)(buf + hp->hp_tail);
+    tail->hp_users = 1;
+
+    struct vr_packet *pkt = &hp->hp_packet;
+    pkt->vp_head = buf;
+    pkt->vp_data = headroom;
+    pkt->vp_tail = headroom + size;
+    pkt->vp_len = size;
+    pkt->vp_end = hp->hp_end;
+
+    return hp;
 }
 
 struct vr_hpacket *
@@ -224,15 +202,18 @@ vr_hpacket_clone(struct vr_hpacket *hpkt)
     struct vr_hpacket *hpkt_c;
     struct vr_hpacket_tail *hpkt_tail;
 
+    if (unlikely(!hpkt))
+        return NULL;
+
     hpkt_c = (struct vr_hpacket *)malloc(sizeof(struct vr_hpacket));
-    if (!hpkt_c)
+    if (unlikely(!hpkt_c))
         return NULL;
 
     memcpy(hpkt_c, hpkt, sizeof(*hpkt));
 
     /* increase the reference count for the buffer */
     hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
-    hpkt_tail->hp_users++;
+    __sync_add_and_fetch(&hpkt_tail->hp_users, 1);
 
     hpkt_c->hp_flags |= VR_HPACKET_FLAGS_CLONED;
     return hpkt_c;
@@ -357,7 +338,15 @@ vr_lib_pfree(struct vr_packet *pkt, uint16_t reason)
     if (!pkt)
         return;
 
-    afxdp_pkt_recycle(pkt);
+    struct vr_hpacket *hpkt;
+
+    hpkt = VR_PACKET_TO_HPACKET(pkt);
+    if (unlikely(!hpkt))
+        return;
+
+    vr_hpacket_free(hpkt);
+
+    return;
 }
 
 static int
@@ -884,7 +873,8 @@ get_random_bytes(void *buf, int nbytes)
 struct afxdp_meta *
 vr_afxdp_pkt_to_afxdp_meta(struct vr_packet *pkt)
 {
-    return (struct afxdp_meta *)((uintptr_t)pkt - sizeof(struct afxdp_meta));
+    struct vr_hpacket *hp = VR_PACKET_TO_HPACKET(pkt);
+    return (struct afxdp_meta *)((uint8_t *)hp + sizeof(struct vr_hpacket));
 }
 
 //  vr_afxdp_pkt_to_xdp_buf - Convert a pointer to vr_packet into the associated
@@ -969,12 +959,16 @@ vr_afxdp_get_packet(struct vr_afxdp_xsk_socket_info *xsk,
     __u32 len = desc->len;
     __u32 headroom = AFXDP_PKT_HEADROOM;
 
-    struct afxdp_meta *m = (struct afxdp_meta *)(data - headroom);
+    struct vr_hpacket *hp = vr_hpacket_alloc(len + headroom);
+    if (!hp)
+        return NULL;
+
+    struct afxdp_meta *m = (struct afxdp_meta *)((uint8_t *)hp + sizeof(struct vr_hpacket));
     m->umem_addr = desc->addr;
     m->len = desc->len;
     m->xsk = xsk;
 
-    pkt = (struct vr_packet *)(m + 1);
+    pkt = &hp->hp_packet;
     pkt->vp_head = (unsigned char *)(data - headroom);
     pkt->vp_data = headroom;
     pkt->vp_tail = headroom + len;
